@@ -2,7 +2,8 @@ from pyueye import ueye
 import cv2
 import numpy as np
 import json
-import math
+import math as m
+from pyzbar import pyzbar
 
 
 class Camera:
@@ -21,13 +22,11 @@ class Camera:
 
         self.load_calibration_config()
 
-        orange_lower = [0, 25, 51]
-        orange_upper = [25, 140, 255]
-        green_lower = [0, 51, 0]
-        green_upper = [102, 255, 102]
         blue_lower = [51, 0, 0]
-        blue_upper = [255, 102, 102]
+        blue_upper = [255, 51, 51]
         self.boundaries = [(blue_lower, blue_upper)]
+        self.cX = None
+        self.cY = None
 
 
     def show_image(self):
@@ -57,10 +56,11 @@ class Camera:
             self.dst = dst[y:y + h, x:x + w]
 
             self.detect_colors()
-            self.draw_contours()
+
+            self.qr_decoder()
 
             cv2.imshow("camera", self.dst)
-            cv2.imshow("only_orange", self.only_certain_color)
+            cv2.imshow("blue_only", self.only_certain_color)
 
             # Kamera schließen
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -94,8 +94,10 @@ class Camera:
             self.mask = cv2.inRange(bgr, lower, upper)
 
             self.only_certain_color = cv2.bitwise_and(bgr, bgr, mask=self.mask)
+        self.draw_contours()
 
     def draw_contours(self):
+        self.ball_position = []
         contours_area = []
         contours_circles = []
         contours, hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[-2:]
@@ -112,17 +114,117 @@ class Camera:
             area = cv2.contourArea(con)
             if perimeter == 0:
                 break
-            circularity = 4 * math.pi * (area / (perimeter * perimeter))
+            circularity = 4 * m.pi * (area / (perimeter * perimeter))
             # print(circularity)
             if 0.7 < circularity < 1.5:
                 contours_circles.append(con)
 
         for cnt in contours_circles:
             M = cv2.moments(cnt)
-            cX = int(M["m10"] / M["m00"])
-            cY = int(M["m01"] / M["m00"])
+            self.cX = int(M["m10"] / M["m00"])
+            self.cY = int(M["m01"] / M["m00"]) + 5
+            self.ball_position.append((self.cX, self.cY))
+
             cv2.drawContours(self.dst, [cnt], 0, (0, 255, 0), 1)
-            cv2.circle(self.dst, (cX, cY + 5), 2, (0, 255, 0), -1)
+            cv2.circle(self.dst, (self.cX, self.cY), 2, (0, 255, 0), -1)
+        #print(self.ball_position)
+
+    def qr_decoder(self):
+        centres = []
+        object_points_array = []
+        self.localization_qr = []
+        qr_codes = pyzbar.decode(self.dst)
+        # loop over the detected barcodes
+        for qr in qr_codes:
+            # extract the bounding box location of the barcode and draw
+            # the bounding box surrounding the barcode on the image
+            (x, y, w, h) = qr.rect
+
+            centre = (x + int((w / 2)), y + int((h / 2)))
+            centres.append(centre)
+
+            cv2.rectangle(self.dst, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            cv2.circle(self.dst, centre, 2, (0, 255, 0), -1)
+
+            # the barcode data is a bytes object so if we want to draw it
+            # on our output image we need to convert it to a string first
+            data = qr.data.decode("utf-8")
+
+            if data == "(40, 0, 0)":
+                object_point = (40, 0, 0)
+                #if len(self.localization_qr) < 3:
+                    #self.localization_qr.append(centre)
+            elif data == "(-40, 0, 0)":
+                object_point = (-40, 0, 0)
+                #if len(self.localization_qr) < 3:
+                    #self.localization_qr.append(centre)
+            elif data == "(30, 30, 0)":
+                object_point = (30, 30, 0)
+                if len(self.localization_qr) < 3:
+                    self.localization_qr.append(centre)
+            elif data == "(-30, 30, 0)":
+                object_point = (-30, 30, 0)
+                if len(self.localization_qr) < 3:
+                    self.localization_qr.append(centre)
+            elif data == "(0, 40, 0)":
+                object_point = (0, 40, 0)
+                if len(self.localization_qr) < 3:
+                    self.localization_qr.append(centre)
+
+            object_points_array.append(object_point)
+            # draw the barcode data and barcode type on the image
+            text = "{}".format(data)
+            cv2.putText(self.dst, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+        #print(self.localization_qr)
+
+        if len(centres) >= 4:
+             # print(object_points_array)
+            self.image_points = np.array(centres, dtype="float")
+            object_points = np.array(object_points_array, dtype="float")
+            # print(object_points)
+            # print(image_points)
+
+            _, rvecs, tvecs, = cv2.solvePnP(object_points, self.image_points, self.camera_matrix, self.dist_coeff)
+
+            origin, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 0.0)]), rvecs, tvecs, self.camera_matrix, self.dist_coeff)
+            z_axis, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 10.0)]), rvecs, tvecs, self.camera_matrix, self.dist_coeff)
+            x_axis, jacobian = cv2.projectPoints(np.array([(10.0, 0.0, 0.0)]), rvecs, tvecs, self.camera_matrix, self.dist_coeff)
+            y_axis, jacobian = cv2.projectPoints(np.array([(0.0, 10.0, 0.0)]), rvecs, tvecs, self.camera_matrix, self.dist_coeff)
+
+            axis = [x_axis, y_axis, z_axis]
+
+            i = 0
+            for x in axis:
+                p1 = (int(origin[0][0][0]), int(origin[0][0][1]))
+                p2 = (int(x[0][0][0]), int(x[0][0][1]))
+                if i == 0:
+                    self.dst = cv2.line(self.dst, p1, p2, (255, 0, 0), 5)
+                elif i == 1:
+                    self.dst = cv2.line(self.dst, p1, p2, (0, 255, 0), 5)
+                elif i == 2:
+                    self.dst = cv2.line(self.dst, p1, p2, (0, 0, 255), 5)
+                i = i + 1
+
+            self.get_ball_position()
+
+    def get_ball_position(self):
+        if len(self.localization_qr) == 3:
+            i = 0
+            for (ball_x, ball_y) in self.ball_position:
+                for (qr_x, qr_y) in self.localization_qr:
+                    distance = (m.sqrt(m.pow((ball_x - qr_x), 2) + m.pow((ball_y - qr_y), 2)))
+                    if i == 0:
+                        cv2.circle(self.dst, (qr_x, qr_y), int(distance), (255, 0, 0), 2)
+                    elif i == 1:
+                        cv2.circle(self.dst, (qr_x, qr_y), int(distance), (0, 255, 0), 2)
+                    elif i == 2:
+                        cv2.circle(self.dst, (qr_x, qr_y), int(distance), (0, 0, 255), 2)
+                    print(distance)
+                i = i + 1
+            self.localization_qr = np.array(self.localization_qr)
+            real_distance = m.sqrt(m.pow(self.localization_qr[1][0] - self.localization_qr[2][0], 2) + m.pow(self.localization_qr[1][1] - self.localization_qr[2][1], 2))
+            print(real_distance)
 
 
 if __name__ == "__main__":
