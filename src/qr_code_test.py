@@ -21,8 +21,7 @@ class DetectColors:
 
         self.load_calibration_config()
 
-        self.object_point = np.array([(0, 45, 0), (5.25, 39.75, 0), (5.25, 50.25, 0), (-5.25, 39.75, 0), (-5.25, 50.25, 0)])
-        self.axis = np.float32([[10, 0, 0], [0, 10, 0], [0, 0, -10]]).reshape(-1, 3)
+        self.size_of_square = 3.6
 
     def show_image(self):
         nRet = ueye.is_InitCamera(self.h_cam, None)
@@ -59,7 +58,7 @@ class DetectColors:
                 break
 
             elif cv2.waitKey(1) & 0xFF == ord('t'):
-                cv2.imwrite("/home/lennart/dorna/camera/images/contour_only_circles.bmp", self.dst)
+                cv2.imwrite("/home/lennart/dorna/camera/images/detected_qr_codes.bmp", self.dst)
                 # cv2.imwrite("/home/lennart/dorna/camera/images/only_orange.bmp", self.output)
 
         ueye.is_FreeImageMem(self.h_cam, self.pcImageMemory, self.MemID)
@@ -90,6 +89,7 @@ class DetectColors:
 
     def qr_decoder(self):
         centres = []
+        object_points_array = []
         qr_codes = pyzbar.decode(self.dst)
         # loop over the detected barcodes
         for qr in qr_codes:
@@ -105,24 +105,52 @@ class DetectColors:
 
             # the barcode data is a bytes object so if we want to draw it
             # on our output image we need to convert it to a string first
-            barcodeData = qr.data.decode("utf-8")
+            data = qr.data.decode("utf-8")
+            #print(data)
 
+            if data == "(40, 0, 0)":
+                object_point = (40, 0, 0)
+            elif data == "(-40, 0, 0)":
+                object_point = (-40, 0, 0)
+            elif data == "(30, 30, 0)":
+                object_point = (30, 30, 0)
+            elif data == "(-30, 30, 0)":
+                object_point = (-30, 30, 0)
+            elif data == "(0, 40, 0)":
+                object_point = (0, 40, 0)
+
+            object_points_array.append(object_point)
             # draw the barcode data and barcode type on the image
-            text = "{}".format(barcodeData)
+            text = "{}".format(data)
             cv2.putText(self.dst, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-            print(centres)
 
         if len(centres) > 4:
+             # print(object_points_array)
             image_points = np.array(centres, dtype="float")
-            print(image_points)
+            object_points = np.array(object_points_array, dtype="float")
+            # print(object_points)
+            # print(image_points)
 
-            _, rvecs, tvecs, inliers = cv2.solvePnPRansac(self.object_point, image_points, self.camera_matrix, self.dist_coeff)
+            _, rvecs, tvecs, = cv2.solvePnP(object_points, image_points, self.camera_matrix, self.dist_coeff)
 
-            imgpts, jacobian = cv2.projectPoints(self.axis, rvecs, tvecs, self.camera_matrix, self.dist_coeff)
+            origin, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 0.0)]), rvecs, tvecs, self.camera_matrix, self.dist_coeff)
+            z_axis, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 10.0)]), rvecs, tvecs, self.camera_matrix, self.dist_coeff)
+            x_axis, jacobian = cv2.projectPoints(np.array([(10.0, 0.0, 0.0)]), rvecs, tvecs, self.camera_matrix, self.dist_coeff)
+            y_axis, jacobian = cv2.projectPoints(np.array([(0.0, 10.0, 0.0)]), rvecs, tvecs, self.camera_matrix, self.dist_coeff)
 
-            p1 = (int(image_points[0][0]), int(image_points[0][1]))
-            p2 = (int(imgpts[0][0][0]), int(imgpts[0][0][1]))
-            self.dst = cv2.line(self.dst, p1, p2, (255, 0, 0), 5)
+            axis = [x_axis, y_axis, z_axis]
+
+            i = 0
+            for x in axis:
+                p1 = (int(origin[0][0][0]), int(origin[0][0][1]))
+                p2 = (int(x[0][0][0]), int(x[0][0][1]))
+                if i == 0:
+                    self.dst = cv2.line(self.dst, p1, p2, (255, 0, 0), 5)
+                elif i == 1:
+                    self.dst = cv2.line(self.dst, p1, p2, (0, 255, 0), 5)
+                elif i == 2:
+                    self.dst = cv2.line(self.dst, p1, p2, (0, 0, 255), 5)
+                i = i + 1
 
 
 if __name__ == "__main__":
