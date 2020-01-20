@@ -8,6 +8,7 @@ from pyzbar import pyzbar
 
 class Camera:
     def __init__(self):
+        # Variabeln für Kameraverarbeitung
         self.h_cam = ueye.HIDS(0)
         self.pitch = ueye.INT()
         self.ColorMode = ueye.IS_CM_BGRA8_PACKED
@@ -19,15 +20,25 @@ class Camera:
         self.MemID = ueye.int()
         self.width = None
         self.height = None
+        self.dst = None
 
+        # laden der kalibrierten Matrix
         self.load_calibration_config()
 
+        # Variabeln zur Farberkennung
         blue_lower = [51, 0, 0]
         blue_upper = [255, 51, 51]
         self.boundaries = [(blue_lower, blue_upper)]
         self.cX = None
         self.cY = None
 
+        # Variablen zur Positionierung
+        self.ball_position = []
+        self.qr_centres = []
+        self.world_points_array = []
+        self.localization_qr_codes = []
+        self.qr_codes = None
+        self.image_points = None
 
     def show_image(self):
         nRet = ueye.is_InitCamera(self.h_cam, None)
@@ -60,14 +71,14 @@ class Camera:
             self.qr_decoder()
 
             cv2.imshow("camera", self.dst)
-            cv2.imshow("blue_only", self.only_certain_color)
+            cv2.imshow("blue_only", self.show_blue_color)
 
             # Kamera schließen
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
             elif cv2.waitKey(1) & 0xFF == ord('t'):
-                cv2.imwrite("/home/lennart/dorna/camera/images/contours.bmp", self.dst)
+                cv2.imwrite("/home/lennart/dorna/camera/images/gps.bmp", self.dst)
 
         ueye.is_FreeImageMem(self.h_cam, self.pcImageMemory, self.MemID)
         ueye.is_ExitCamera(self.h_cam)
@@ -93,11 +104,11 @@ class Camera:
 
             self.mask = cv2.inRange(bgr, lower, upper)
 
-            self.only_certain_color = cv2.bitwise_and(bgr, bgr, mask=self.mask)
+            self.show_blue_color = cv2.bitwise_and(bgr, bgr, mask=self.mask)
         self.draw_contours()
 
     def draw_contours(self):
-        self.ball_position = []
+        self.ball_position.clear()
         contours_area = []
         contours_circles = []
         contours, hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[-2:]
@@ -130,62 +141,67 @@ class Camera:
         #print(self.ball_position)
 
     def qr_decoder(self):
-        centres = []
-        object_points_array = []
-        self.localization_qr = []
-        qr_codes = pyzbar.decode(self.dst)
+        self.qr_centres.clear()
+        self.world_points_array.clear()
+        self.localization_qr_codes.clear()
+        self.qr_codes = pyzbar.decode(self.dst)
         # loop over the detected barcodes
-        for qr in qr_codes:
+        for qr in self.qr_codes:
             # extract the bounding box location of the barcode and draw
             # the bounding box surrounding the barcode on the image
             (x, y, w, h) = qr.rect
 
             centre = (x + int((w / 2)), y + int((h / 2)))
-            centres.append(centre)
+            self.qr_centres.append(centre)
 
             cv2.rectangle(self.dst, (x, y), (x + w, y + h), (0, 0, 255), 2)
             cv2.circle(self.dst, centre, 2, (0, 255, 0), -1)
 
-            # the barcode data is a bytes object so if we want to draw it
+            # the barcode data is a bytes world so if we want to draw it
             # on our output image we need to convert it to a string first
             data = qr.data.decode("utf-8")
 
-            if data == "(40, 0, 0)":
-                object_point = (40, 0, 0)
-                #if len(self.localization_qr) < 3:
-                    #self.localization_qr.append(centre)
-            elif data == "(-40, 0, 0)":
-                object_point = (-40, 0, 0)
-                #if len(self.localization_qr) < 3:
-                    #self.localization_qr.append(centre)
-            elif data == "(30, 30, 0)":
-                object_point = (30, 30, 0)
-                if len(self.localization_qr) < 3:
-                    self.localization_qr.append(centre)
-            elif data == "(-30, 30, 0)":
-                object_point = (-30, 30, 0)
-                if len(self.localization_qr) < 3:
-                    self.localization_qr.append(centre)
-            elif data == "(0, 40, 0)":
-                object_point = (0, 40, 0)
-                if len(self.localization_qr) < 3:
-                    self.localization_qr.append(centre)
+            if data == "(70, 10, 0)":
+                world_point = (70, 10, 0)
+                if len(self.localization_qr_codes) < 3:
+                    self.localization_qr_codes.append(centre)
+            elif data == "(60, 40, 0)":
+                world_point = (60, 40, 0)
+                if len(self.localization_qr_codes) < 3:
+                    self.localization_qr_codes.append(centre)
+            elif data == "(40, 60, 0)":
+                world_point = (40, 60, 0)
+                if len(self.localization_qr_codes) < 3:
+                    self.localization_qr_codes.append(centre)
+            elif data == "(-40, 60, 0)":
+                world_point = (-40, 60, 0)
+                if len(self.localization_qr_codes) < 3:
+                    self.localization_qr_codes.append(centre)
+            elif data == "(-60, 40, 0)":
+                world_point = (-60, 40, 0)
+                if len(self.localization_qr_codes) < 3:
+                    self.localization_qr_codes.append(centre)
+            elif data == "(-70, 10, 0)":
+                world_point = (-70, 10, 0)
+                if len(self.localization_qr_codes) < 3:
+                    self.localization_qr_codes.append(centre)
 
-            object_points_array.append(object_point)
+            self.world_points_array.append(world_point)
             # draw the barcode data and barcode type on the image
             text = "{}".format(data)
             cv2.putText(self.dst, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
-        #print(self.localization_qr)
+        # print(self.world_points_array)
+        # print(self.localization_qr_codes)
 
-        if len(centres) >= 4:
-             # print(object_points_array)
-            self.image_points = np.array(centres, dtype="float")
-            object_points = np.array(object_points_array, dtype="float")
-            # print(object_points)
+        if len(self.qr_centres) >= 4:
+            # print(world_points_array)
+            self.image_points = np.array(self.qr_centres, dtype="float")
+            world_points = np.array(self.world_points_array, dtype="float")
+            # print(world_points)
             # print(image_points)
 
-            _, rvecs, tvecs, = cv2.solvePnP(object_points, self.image_points, self.camera_matrix, self.dist_coeff)
+            _, rvecs, tvecs, = cv2.solvePnP(world_points, self.image_points, self.camera_matrix, self.dist_coeff)
 
             origin, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 0.0)]), rvecs, tvecs, self.camera_matrix, self.dist_coeff)
             z_axis, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 10.0)]), rvecs, tvecs, self.camera_matrix, self.dist_coeff)
@@ -209,22 +225,44 @@ class Camera:
             self.get_ball_position()
 
     def get_ball_position(self):
-        if len(self.localization_qr) == 3:
+        if len(self.localization_qr_codes) == 3:
+            world_distance_of_qr_codes = []
+            for i in range(len(self.world_points_array)):
+                x_1, y_1, z_1 = self.world_points_array[i]
+                if i < len(self.world_points_array) - 1:
+                    j = i + 1
+                else:
+                    break
+                while j <= len(self.world_points_array):
+                    print(j)
+                    x_2, y_2, z_2 = self.world_points_array[j]
+                    world_distance_of_qr_codes.append(m.sqrt((m.pow((x_1 - x_2), 2) + m.pow((y_1 - y_2), 2))))
+                    if j < len(self.world_points_array) - 1:
+                        j = j + 1
+                    else:
+                        break
+            print(world_distance_of_qr_codes)
+
+            distance_balls_to_qr_code = []
             i = 0
             for (ball_x, ball_y) in self.ball_position:
-                for (qr_x, qr_y) in self.localization_qr:
-                    distance = (m.sqrt(m.pow((ball_x - qr_x), 2) + m.pow((ball_y - qr_y), 2)))
+                distance = []
+                n_distance = 0
+                for (qr_x, qr_y) in self.localization_qr_codes:
+                    distance.append(m.sqrt(m.pow((ball_x - qr_x), 2) + m.pow((ball_y - qr_y), 2)))
                     if i == 0:
-                        cv2.circle(self.dst, (qr_x, qr_y), int(distance), (255, 0, 0), 2)
+                        cv2.circle(self.dst, (qr_x, qr_y), int(distance[n_distance]), (255, 0, 0), 2)
                     elif i == 1:
-                        cv2.circle(self.dst, (qr_x, qr_y), int(distance), (0, 255, 0), 2)
+                        cv2.circle(self.dst, (qr_x, qr_y), int(distance[n_distance]), (0, 255, 0), 2)
                     elif i == 2:
-                        cv2.circle(self.dst, (qr_x, qr_y), int(distance), (0, 0, 255), 2)
-                    print(distance)
+                        cv2.circle(self.dst, (qr_x, qr_y), int(distance[n_distance]), (0, 0, 255), 2)
+                    n_distance = n_distance + 1
+                distance_balls_to_qr_code.append(distance)
+                # print(distance_of_balls)
                 i = i + 1
-            self.localization_qr = np.array(self.localization_qr)
-            real_distance = m.sqrt(m.pow(self.localization_qr[1][0] - self.localization_qr[2][0], 2) + m.pow(self.localization_qr[1][1] - self.localization_qr[2][1], 2))
-            print(real_distance)
+            self.localization_qr_codes = np.array(self.localization_qr_codes)
+            real_distance = m.sqrt(m.pow(self.localization_qr_codes[1][0] - self.localization_qr_codes[2][0], 2) + m.pow(self.localization_qr_codes[1][1] - self.localization_qr_codes[2][1], 2))
+            # print(real_distance)
 
 
 if __name__ == "__main__":
