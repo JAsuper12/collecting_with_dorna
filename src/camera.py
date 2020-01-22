@@ -324,46 +324,124 @@ class Camera:
 
             equations = []
 
-            '''for j in range(len(self.world_localization_qr_codes)):
-                x = 1
-                x_k = self.world_localization_qr_codes[j][0]
-                y = 1
-                y_k = self.world_localization_qr_codes[j][1]
-                k = (distance_balls_to_qr_code[0][j] * cm_per_pixel) ** 2
-                equations.append([x, x_k, y, y_k, k])
-            print(equations)'''
+            for j in range(len(self.world_localization_qr_codes)):
+                x = self.world_localization_qr_codes[j][0]
+                y = self.world_localization_qr_codes[j][1]
+                r = (distance_balls_to_qr_code[0][j] * cm_per_pixel) ** 2
+                equations.append([x, y, r])
+            print(equations)
 
-            a_1 = 30
-            b_1 = 30
-            k_1 = 22.32
-            a_2 = 0
-            b_2 = 40
-            k_2 = 19.41
+            x_y_coordinates = []
+            for i in range(3):
+                x_coordinates = []
+                y_coordinates = []
+                if i < 2:
+                    a_1 = equations[i][0]
+                    b_1 = equations[i][1]
+                    r_1 = equations[i][2]
+                    a_2 = equations[i + 1][0]
+                    b_2 = equations[i + 1][1]
+                    r_2 = equations[i + 1][2]
+                else:
+                    a_1 = equations[i][0]
+                    b_1 = equations[i][1]
+                    r_1 = equations[i][2]
+                    a_2 = equations[0][0]
+                    b_2 = equations[0][1]
+                    r_2 = equations[0][2]
 
-            a = a_1 - a_2
-            print(a)
-            k = k_2 - k_1
-            print(k)
-            b = b_1 - b_2
-            print(b ** 2)
-            c = (k ** 2 + b ** 2 - a ** 2) / (2 * a)
-            print(c)
-            d = -1 - (b / a) ** 2
-            print(d)
-            e = 2 * b_1 + 2 * b * c / a
-            print(e)
-            f = c ** 2 + b_1 ** 2 - k_1 ** 2
-            print(f)
+                a = a_1 - a_2
 
-            p = e / d
-            print(p)
-            q = -f / d
-            print(q)
+                c = (r_2 ** 2 - r_1 ** 2 + b_1 ** 2 - b_2 ** 2 - a ** 2) / (2 * a)
+                d = -1 - (b_2 - b_1) ** 2 / a ** 2
+                e = 2 * b_1 - 2 * (b_2 - b_1) * c / a
+                f = r_1 ** 2 - b_1 ** 2 - c ** 2
 
-            y_1 = -p / 2 + m.sqrt((p / 2) ** 2 - q)
-            y_2 = -p / 2 - m.sqrt((p / 2) ** 2 - q)
-            print(y_1, y_2)
+                p = e / d
+                q = f / d
 
+                y_coordinates.append(-p / 2 + m.sqrt((p / 2) ** 2 - q))
+                y_coordinates.append(-p / 2 - m.sqrt((p / 2) ** 2 - q))
+
+                for y in y_coordinates:
+                    x_coordinates.append(m.sqrt(r_1 ** 2 - y ** 2 + 2 * b_1 * y - b_1 ** 2) + a_1)
+                    x_coordinates.append(-m.sqrt(r_1 ** 2 - y ** 2 + 2 * b_1 * y - b_1 ** 2) + a_1)
+
+                for j in range(4):
+                    if j < 2:
+                        x_y_coordinates.append([x_coordinates[j], y_coordinates[0]])
+                    else:
+                        x_y_coordinates.append([x_coordinates[j], y_coordinates[1]])
+
+            coordinates_found = False
+            found_similar_x_coordinates = False
+            found_similar_y_coordinates = False
+            similar_y_coordinates = []
+            similar_coordinates = []
+            while not coordinates_found:
+                place_of_similar_x_coordinates = [0]
+                place_of_similar_y_coordinates = [0]
+                n = 1
+                # print(x_y_coordinates)
+                while not found_similar_y_coordinates:
+                    difference = x_y_coordinates[0][1] - x_y_coordinates[n][1]
+                    if -1 < difference < 1:
+                        place_of_similar_y_coordinates.append(n)
+                        # print(place_of_similar_y_coordinates)
+                    if len(place_of_similar_y_coordinates) < 6:
+                        if n < len(x_y_coordinates) - 1:
+                            n = n + 1
+                        else:
+                            removed = 0
+                            for y in place_of_similar_y_coordinates:
+                                x_y_coordinates.remove(x_y_coordinates[y - removed])
+                                removed = removed + 1
+                            similar_y_coordinates.clear()
+                            break
+                    else:
+                        for y in place_of_similar_y_coordinates:
+                            similar_y_coordinates.append(x_y_coordinates[y])
+                        found_similar_y_coordinates = True
+
+                    # print(similar_y_coordinates)
+
+                if found_similar_y_coordinates:
+                    n = 1
+                    while not found_similar_x_coordinates:
+                        difference = similar_y_coordinates[0][0] - similar_y_coordinates[n][0]
+                        if -1 < difference < 1:
+                            place_of_similar_x_coordinates.append(n)
+                        if len(place_of_similar_x_coordinates) < 3:
+                            if n < len(similar_y_coordinates) - 1:
+                                n = n + 1
+                            else:
+                                removed = 0
+                                for x in place_of_similar_x_coordinates:
+                                    similar_y_coordinates.remove(similar_y_coordinates[x - removed])
+                                    removed = removed + 1
+                                n = 1
+                                break
+                        else:
+                            for x in place_of_similar_x_coordinates:
+                                similar_coordinates.append(similar_y_coordinates[x])
+                            found_similar_x_coordinates = True
+                            coordinates_found = True
+
+            # print(similar_coordinates)
+
+            sum_x_coordinates = 0
+            sum_y_coordinates = 0
+            for i in range(3):
+                sum_x_coordinates = sum_x_coordinates + similar_coordinates[i][0]
+                sum_y_coordinates = sum_y_coordinates + similar_coordinates[i][1]
+
+            average_x_coordinate = sum_x_coordinates / 3
+            average_y_coordinate = sum_y_coordinates / 3
+
+            ball_coordinate = [average_x_coordinate, average_y_coordinate]
+
+            print(ball_coordinate)
+            
 
 if __name__ == "__main__":
     camera = Camera()
