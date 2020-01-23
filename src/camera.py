@@ -150,6 +150,7 @@ class Camera:
         self.world_localization_qr_codes.clear()
         self.qr_codes = pyzbar.decode(self.dst)
         # loop over the detected barcodes
+        q = 0
         for qr in self.qr_codes:
             # extract the bounding box location of the barcode and draw
             # the bounding box surrounding the barcode on the image
@@ -196,30 +197,35 @@ class Camera:
                     self.localization_qr_codes.append(centre)
                     self.world_localization_qr_codes.append([-70, 10, 0])
 
+            q = q + 1
+
             self.world_points.append(world_point)
-            world_points = np.array(self.world_points, dtype="float")
 
             # draw the barcode data and barcode type on the image
             text = "{}".format(data)
             cv2.putText(self.dst, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
-            # prüfen, ob die qr Codes gut verteilt sind
-            positive_qr_codes = 0
-            negative_qr_codes = 0
-            for coordinates in world_points:
-                if coordinates[0] > 0:
-                    positive_qr_codes = positive_qr_codes + 1
-                else:
-                    negative_qr_codes = negative_qr_codes + 1
-
-            if positive_qr_codes >= 2 and negative_qr_codes >= 2:
-                valid_qr_spread = True
+        world_points = np.array(self.world_points, dtype="float")
+        # prüfen, ob die qr Codes gut verteilt sind
+        positive_qr_codes = 0
+        negative_qr_codes = 0
+        for coordinates in world_points:
+            if coordinates[0] > 0:
+                positive_qr_codes = positive_qr_codes + 1
             else:
-                valid_qr_spread = False
+                negative_qr_codes = negative_qr_codes + 1
+
+        if positive_qr_codes >= 2 and negative_qr_codes >= 2:
+            valid_qr_spread = True
+        else:
+            valid_qr_spread = False
+
+
+        # print(self.world_points, self.qr_centres)
 
         # print(self.world_points)
         # print(self.localization_qr_codes)
-
+        # print(nr_qr_codes)
         if len(self.qr_centres) >= 4 and valid_qr_spread:
             # print(world_points)
             self.image_points_of_qr_codes = np.array(self.qr_centres, dtype="float")
@@ -460,7 +466,7 @@ class Camera:
                         x_difference.remove(x_difference[1])
                     else:
                         x_difference.remove(x_difference[0])
-            image_coordinate, jacobian = cv2.projectPoints(np.array([(x_difference[0][0], x_difference[0][1], 0.0)]), self.rvecs, self.tvecs,self.camera_matrix, self.dist_coeff)
+            image_coordinate, jacobian = cv2.projectPoints(np.array([(x_difference[0][0], x_difference[0][1], 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             print(x_difference[0][0], x_difference[0][1])
             estimated_point = (int(image_coordinate[0][0][0]), int(image_coordinate[0][0][1]))
             cv2.circle(self.dst, estimated_point, 2, (0, 0, 255), -1)
@@ -484,7 +490,7 @@ class Camera:
                 x_cm_per_pixel.append(5 / m.sqrt((y_1[0][0][0] - y_2[0][0][0]) ** 2 + (y_1[0][0][1] - y_2[0][0][1]) ** 2))
                 x = x + 0.1
 
-            print(image_coordinate, self.ball_position)
+            # print(image_coordinate, self.ball_position)
             sum = 0
             for j in y_cm_per_pixel:
                 sum = sum + j
@@ -500,7 +506,7 @@ class Camera:
             i_x = (x_b - image_coordinate[0][0][0]) * average_x_cm_per_pixel
             i_y = (y_b - image_coordinate[0][0][1]) * average_y_cm_per_pixel
             radius = m.sqrt(i_x ** 2 + i_y ** 2)
-            # print(radius)
+            print(radius)
 
 
 if __name__ == "__main__":
