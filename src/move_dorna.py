@@ -167,7 +167,7 @@ if __name__ == "__main__":
     while repeat:
         try:
             _input = input("(p): Position eingeben \n(c): Bälle einsammeln \n(z): zugreifen \n(a): Greifer oeffnen "
-                           "\n(o): Nullposition: ")
+                           "\n(o): In die Nullposition fahren: ")
         except NameError:
             continue
         except SyntaxError:
