@@ -26,14 +26,20 @@ class Camera:
         self.load_calibration_config()
 
         # Variabeln zur Farberkennung
+        self.found_container = False
+        self.contours_rectangle = []
         blue_lower = [51, 0, 0]
         blue_upper = [255, 62, 62]
         self.boundaries = [(blue_lower, blue_upper)]
         self.cX = None
         self.cY = None
+        self.cX_container = None
+        self.cY_container = None
 
         # Variablen zur Positionierung
+        self.container_world_position = []
         self.ball_position = []
+        self.container_position = []
         self.qr_centres = []
         self.world_points = []
         self.qr_codes = None
@@ -125,13 +131,17 @@ class Camera:
         for con in contours_area:
             perimeter = cv2.arcLength(con, True)
             area = cv2.contourArea(con)
+            approx = cv2.approxPolyDP(con, 0.04 * perimeter, True)
             # print(area)
             if perimeter == 0:
                 break
             circularity = 4 * m.pi * (area / (perimeter * perimeter))
             # print(circularity)
-            if 0.25 < circularity < 1.5:
+            if 0.75 < circularity < 1.5:
                 contours_circles.append(con)
+            elif len(approx) == 4 and not self.found_container:
+                # compute the bounding box of the contour
+                self.contours_rectangle.append(con)
 
         for cnt in contours_circles:
             M = cv2.moments(cnt)
@@ -142,6 +152,13 @@ class Camera:
             cv2.drawContours(self.dst, [cnt], 0, (0, 255, 0), 1)
             cv2.circle(self.dst, (self.cX, self.cY), 2, (0, 255, 0), -1)
         # print(self.ball_position)
+        for cnt in self.contours_rectangle:
+            M = cv2.moments(cnt)
+            self.cX_container = int(M["m10"] / M["m00"])
+            self.cY_container = int(M["m01"] / M["m00"])
+            self.container_position.append((self.cX_container, self.cY_container))
+            cv2.drawContours(self.dst, [cnt], 0, (255, 0, 0), 1)
+            cv2.circle(self.dst, (self.cX_container, self.cY_container), 1, (255, 0, 0), -1)
 
     def qr_decoder(self):
         self.qr_centres.clear()
@@ -150,7 +167,7 @@ class Camera:
         self.world_localization_qr_codes.clear()
         self.qr_codes = pyzbar.decode(self.dst)
         # loop over the detected barcodes
-        q = 0
+
         for qr in self.qr_codes:
             # extract the bounding box location of the barcode and draw
             # the bounding box surrounding the barcode on the image
@@ -196,8 +213,6 @@ class Camera:
                 if len(self.localization_qr_codes) < 3:
                     self.localization_qr_codes.append(centre)
                     self.world_localization_qr_codes.append([-70, 10, 0])
-
-            q = q + 1
 
             self.world_points.append(world_point)
 
@@ -435,9 +450,10 @@ class Camera:
                         print(ball_coordinate)
 
     def get_ball_position_with_grid(self):
-        if len(self.ball_position) > 0:
+        ball_world_positions = []
+        for ball in self.ball_position:
             y_coordinate_of_smallest_difference = []
-            x_b, y_b = self.ball_position[0]
+            x_b, y_b = ball
             x = -60
             x_difference = []
             while x <= 60:
@@ -466,12 +482,55 @@ class Camera:
                         x_difference.remove(x_difference[1])
                     else:
                         x_difference.remove(x_difference[0])
-            image_coordinate, jacobian = cv2.projectPoints(np.array([(x_difference[0][0], x_difference[0][1], 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-            print(x_difference[0][0], x_difference[0][1])
+
+            ball_world_positions.append((x_difference[0][0], x_difference[0][1]))
+
+        for balls in ball_world_positions:
+            image_coordinate, jacobian = cv2.projectPoints(
+                np.array([(x_difference[0][0], x_difference[0][1], 0.0)]), self.rvecs, self.tvecs,
+                self.camera_matrix, self.dist_coeff)
             estimated_point = (int(image_coordinate[0][0][0]), int(image_coordinate[0][0][1]))
             cv2.circle(self.dst, estimated_point, 2, (0, 0, 255), -1)
 
-            y = x_difference[0][1] - 2.5
+        if not self.found_container:
+            y_coordinate_of_smallest_difference = []
+            x_b, y_b = self.container_position[0]
+            x = -60
+            x_difference = []
+            while x <= 60:
+                y = -10
+                y_difference = []
+                while y <= 60:
+                    image_coordinate, jacobian = cv2.projectPoints(np.array([(x, y, 0.0)]), self.rvecs, self.tvecs,
+                                                                   self.camera_matrix, self.dist_coeff)
+                    y_difference.append([y, y_b - image_coordinate[0][0][1]])
+                    # print(y_difference)
+                    if len(y_difference) == 2:
+                        if 0 < y_difference[0][1] < y_difference[1][1] or y_difference[1][1] < y_difference[0][1] < 0:
+                            y_difference.remove(y_difference[1])
+                        else:
+                            y_difference.remove(y_difference[0])
+                    y = y + 2.5
+                y_coordinate_of_smallest_difference.append(y_difference[0][0])
+                x = x + 2.5
+            # print(y_coordinate_of_smallest_difference)
+            for y in range(len(y_coordinate_of_smallest_difference)):
+                image_coordinate, jacobian = cv2.projectPoints(
+                    np.array([(y * 2.5 - 60, y_coordinate_of_smallest_difference[y], 0.0)]), self.rvecs, self.tvecs,
+                    self.camera_matrix, self.dist_coeff)
+                # print(image_coordinate, self.ball_position)
+                x_difference.append(
+                    [y * 2.5 - 60, y_coordinate_of_smallest_difference[y], x_b - image_coordinate[0][0][0]])
+                # print(x_difference)
+                if len(x_difference) == 2:
+                    if 0 < x_difference[0][2] < x_difference[1][2] or x_difference[1][2] < x_difference[0][2] < 0:
+                        x_difference.remove(x_difference[1])
+                    else:
+                        x_difference.remove(x_difference[0])
+
+            self.container_world_position.append((x_difference[0][0], x_difference[0][1]))
+            self.found_container = True
+            '''y = x_difference[0][1] - 2.5
             x = x_difference[0][0] - 2.5
             y_cm_per_pixel = []
             x_cm_per_pixel = []
@@ -506,7 +565,8 @@ class Camera:
             i_x = (x_b - image_coordinate[0][0][0]) * average_x_cm_per_pixel
             i_y = (y_b - image_coordinate[0][0][1]) * average_y_cm_per_pixel
             radius = m.sqrt(i_x ** 2 + i_y ** 2)
-            print(radius)
+            print(radius)'''
+        print("Positionen der Bälle: ", ball_world_positions, "\nPosition des Behälters: ", self.container_world_position)
 
 
 if __name__ == "__main__":
