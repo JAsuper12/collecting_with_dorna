@@ -17,6 +17,7 @@ class MoveDorna:
                 proceed = True
 
             elif _input == "n":
+                self.terminate()
                 break
 
         if proceed:
@@ -78,16 +79,16 @@ class MoveDorna:
             y = output.get("y")
             z = output.get("z")
 
-            five_over_ball = JointValue(x, y, z + 5)
-            one_over_ball = JointValue(x, y, z + 1)
+            five_above_ball = JointValue(x, y, z + 5)
+            one_above_ball = JointValue(x, y, z + 1)
 
-            five_over_ball_result = five_over_ball.calc_joint_values()
-            one_over_ball_result = one_over_ball.calc_joint_values()
+            five_above_ball_result = five_above_ball.calc_joint_values()
+            one_above_ball_result = one_above_ball.calc_joint_values()
 
-            five_over_ball_array = self.get_joints(five_over_ball_result)
-            one_over_ball_array = self.get_joints(one_over_ball_result)
+            five_above_ball_array = self.get_joints(five_above_ball_result)
+            one_above_ball_array = self.get_joints(one_above_ball_result)
 
-            balls_dict = {"1.": five_over_ball_array, "2.": one_over_ball_array, "3.": five_over_ball_array}
+            balls_dict = {"1.": five_above_ball_array, "2.": one_above_ball_array, "3.": five_above_ball_array}
 
             balls_array.append(balls_dict)
 
@@ -98,15 +99,15 @@ class MoveDorna:
         y = output.get("y")
         z = output.get("z")
 
-        ten_over_container = JointValue(x, y, z + 10)
-        ten_over_container_result = ten_over_container.calc_joint_values()
-        ten_over_container_array = self.get_joints(ten_over_container_result)
+        ten_above_container = JointValue(x, y, z + 10)
+        ten_above_container_result = ten_above_container.calc_joint_values()
+        ten_above_container_array = self.get_joints(ten_above_container_result)
 
         print(balls_array)
         balls_array_len = len(balls_array)
         for x in range(balls_array_len):
             print(balls_array[x])
-        print(ten_over_container_array)
+        print(ten_above_container_array)
         proceed = True
 
         while proceed:
@@ -129,7 +130,7 @@ class MoveDorna:
                 self.move_dorna(second)
                 self.close_gripper()
                 self.move_dorna(third)
-                self.move_dorna(ten_over_container_array)
+                self.move_dorna(ten_above_container_array)
                 self.open_gripper()
 
             print("Bewegung ausgeführt.")
@@ -167,7 +168,7 @@ if __name__ == "__main__":
     while repeat:
         try:
             _input = input("(p): Position eingeben \n(c): Bälle einsammeln \n(z): zugreifen \n(a): Greifer oeffnen "
-                           "\n(o): In die Nullposition fahren: ")
+                           "\n(o): Nullposition: ")
         except NameError:
             continue
         except SyntaxError:
