@@ -46,6 +46,7 @@ class Camera:
         self.image_points_of_qr_codes = None
         self.localization_qr_codes = []
         self.world_localization_qr_codes = []
+        self.increment = 0.5
 
     def show_image(self):
         nRet = ueye.is_InitCamera(self.h_cam, None)
@@ -468,14 +469,14 @@ class Camera:
                             y_difference.remove(y_difference[1])
                         else:
                             y_difference.remove(y_difference[0])
-                    y = y + 2.5
+                    y = y + self.increment
                 y_coordinate_of_smallest_difference.append(y_difference[0][0])
-                x = x + 2.5
+                x = x + self.increment
             # print(y_coordinate_of_smallest_difference)
             for y in range(len(y_coordinate_of_smallest_difference)):
-                image_coordinate, jacobian = cv2.projectPoints(np.array([(y * 2.5 - 60, y_coordinate_of_smallest_difference[y], 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+                image_coordinate, jacobian = cv2.projectPoints(np.array([(y * self.increment - 60, y_coordinate_of_smallest_difference[y], 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
                 # print(image_coordinate, self.ball_position)
-                x_difference.append([y * 2.5 - 60, y_coordinate_of_smallest_difference[y], x_b - image_coordinate[0][0][0]])
+                x_difference.append([y * self.increment - 60, y_coordinate_of_smallest_difference[y], x_b - image_coordinate[0][0][0]])
                 # print(x_difference)
                 if len(x_difference) == 2:
                     if 0 < x_difference[0][2] < x_difference[1][2] or x_difference[1][2] < x_difference[0][2] < 0:
@@ -492,7 +493,7 @@ class Camera:
             estimated_point = (int(image_coordinate[0][0][0]), int(image_coordinate[0][0][1]))
             cv2.circle(self.dst, estimated_point, 2, (0, 0, 255), -1)
 
-        if not self.found_container:
+        if not self.found_container and len(self.container_position) > 0:
             y_coordinate_of_smallest_difference = []
             x_b, y_b = self.container_position[0]
             x = -60
@@ -510,17 +511,17 @@ class Camera:
                             y_difference.remove(y_difference[1])
                         else:
                             y_difference.remove(y_difference[0])
-                    y = y + 2.5
+                    y = y + self.increment
                 y_coordinate_of_smallest_difference.append(y_difference[0][0])
-                x = x + 2.5
+                x = x + self.increment
             # print(y_coordinate_of_smallest_difference)
             for y in range(len(y_coordinate_of_smallest_difference)):
                 image_coordinate, jacobian = cv2.projectPoints(
-                    np.array([(y * 2.5 - 60, y_coordinate_of_smallest_difference[y], 0.0)]), self.rvecs, self.tvecs,
+                    np.array([(y * self.increment - 60, y_coordinate_of_smallest_difference[y], 0.0)]), self.rvecs, self.tvecs,
                     self.camera_matrix, self.dist_coeff)
                 # print(image_coordinate, self.ball_position)
                 x_difference.append(
-                    [y * 2.5 - 60, y_coordinate_of_smallest_difference[y], x_b - image_coordinate[0][0][0]])
+                    [y * self.increment - 60, y_coordinate_of_smallest_difference[y], x_b - image_coordinate[0][0][0]])
                 # print(x_difference)
                 if len(x_difference) == 2:
                     if 0 < x_difference[0][2] < x_difference[1][2] or x_difference[1][2] < x_difference[0][2] < 0:
@@ -530,21 +531,21 @@ class Camera:
 
             self.container_world_position.append((x_difference[0][0], x_difference[0][1]))
             self.found_container = True
-            '''y = x_difference[0][1] - 2.5
-            x = x_difference[0][0] - 2.5
+            '''y = x_difference[0][1] - self.increment
+            x = x_difference[0][0] - self.increment
             y_cm_per_pixel = []
             x_cm_per_pixel = []
-            while y < x_difference[0][1] + 2.5:
-                x_1, jacobian = cv2.projectPoints(np.array([(x_difference[0][0] - 2.5, y, 0.0)]),
+            while y < x_difference[0][1] + self.increment:
+                x_1, jacobian = cv2.projectPoints(np.array([(x_difference[0][0] - self.increment, y, 0.0)]),
                                                   self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-                x_2, jacobian = cv2.projectPoints(np.array([(x_difference[0][0] + 2.5, y, 0.0)]),
+                x_2, jacobian = cv2.projectPoints(np.array([(x_difference[0][0] + self.increment, y, 0.0)]),
                                                   self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
                 y_cm_per_pixel.append(5 / m.sqrt((x_1[0][0][0] - x_2[0][0][0]) ** 2 + (x_1[0][0][1] - x_2[0][0][1]) ** 2))
                 y = y + 0.1
-            while x < x_difference[0][0] + 2.5:
-                y_1, jacobian = cv2.projectPoints(np.array([(x, x_difference[0][1] - 2.5, 0.0)]),
+            while x < x_difference[0][0] + self.increment:
+                y_1, jacobian = cv2.projectPoints(np.array([(x, x_difference[0][1] - self.increment, 0.0)]),
                                                   self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-                y_2, jacobian = cv2.projectPoints(np.array([(x, x_difference[0][1] + 2.5, 0.0)]),
+                y_2, jacobian = cv2.projectPoints(np.array([(x, x_difference[0][1] + self.increment, 0.0)]),
                                                   self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
                 x_cm_per_pixel.append(5 / m.sqrt((y_1[0][0][0] - y_2[0][0][0]) ** 2 + (y_1[0][0][1] - y_2[0][0][1]) ** 2))
                 x = x + 0.1
