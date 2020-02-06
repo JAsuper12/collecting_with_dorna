@@ -49,7 +49,7 @@ class PublishCoordinates:
         self.image_points_of_qr_codes = None
         self.localization_qr_codes = []
         self.world_localization_qr_codes = []
-        self.increment = 0.5
+        self.increment = 0.25
 
     def show_image(self):
         nRet = ueye.is_InitCamera(self.h_cam, None)
@@ -120,6 +120,9 @@ class PublishCoordinates:
         contours_area = []
         contours_circles = []
         contours, hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[-2:]
+
+        if not self.found_container:
+            self.contours_rectangle.clear()
 
         for con in contours:
             area = cv2.contourArea(con)
