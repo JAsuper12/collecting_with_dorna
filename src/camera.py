@@ -46,7 +46,7 @@ class Camera:
         self.image_points_of_qr_codes = None
         self.localization_qr_codes = []
         self.world_localization_qr_codes = []
-        self.increment = 0.5
+        self.increment = 0.25
 
     def show_image(self):
         nRet = ueye.is_InitCamera(self.h_cam, None)
@@ -77,7 +77,7 @@ class Camera:
 
             self.detect_colors()
 
-            self.qr_decoder()
+            #self.qr_decoder()
 
             cv2.imshow("camera", self.dst)
             cv2.imshow("blue_only", self.show_blue_color)
@@ -87,7 +87,8 @@ class Camera:
                 break
 
             elif cv2.waitKey(1) & 0xFF == ord('t'):
-                cv2.imwrite("/home/lennart/dorna/camera/images/gps.bmp", self.dst)
+                cv2.imwrite("/home/lennart/dorna/camera/images/image.bmp", self.dst)
+                cv2.imwrite("/home/lennart/dorna/camera/images/mask.bmp", self.show_blue_color)
 
         ueye.is_FreeImageMem(self.h_cam, self.pcImageMemory, self.MemID)
         ueye.is_ExitCamera(self.h_cam)
@@ -122,7 +123,10 @@ class Camera:
         contours_circles = []
         contours, hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[-2:]
 
-        # calculate area and filter into new array
+        if not self.found_container:
+            self.contours_rectangle.clear()
+
+        # check area
         for con in contours:
             area = cv2.contourArea(con)
             if 200 < area < 10000:
@@ -132,17 +136,17 @@ class Camera:
         for con in contours_area:
             perimeter = cv2.arcLength(con, True)
             area = cv2.contourArea(con)
-            approx = cv2.approxPolyDP(con, 0.04 * perimeter, True)
-            # print(area)
-            if perimeter == 0:
-                break
-            circularity = 4 * m.pi * (area / (perimeter * perimeter))
-            # print(circularity)
+            approx = cv2.approxPolyDP(con, 0.01 * perimeter, True)
+
+            '''circularity = 4 * m.pi * (area / (perimeter * perimeter))
             if 0.75 < circularity < 1.5:
-                contours_circles.append(con)
-            elif len(approx) == 4 and not self.found_container:
+                contours_circles.append(con)'''
+
+            if len(approx) == 4 and not self.found_container:
                 # compute the bounding box of the contour
                 self.contours_rectangle.append(con)
+            else:
+                contours_circles.append(con)
 
         for cnt in contours_circles:
             M = cv2.moments(cnt)
@@ -152,14 +156,14 @@ class Camera:
 
             cv2.drawContours(self.dst, [cnt], 0, (0, 255, 0), 1)
             cv2.circle(self.dst, (self.cX, self.cY), 2, (0, 255, 0), -1)
-        # print(self.ball_position)
+
         for cnt in self.contours_rectangle:
             M = cv2.moments(cnt)
             self.cX_container = int(M["m10"] / M["m00"])
             self.cY_container = int(M["m01"] / M["m00"])
             self.container_position.append((self.cX_container, self.cY_container))
-            cv2.drawContours(self.dst, [cnt], 0, (255, 0, 0), 1)
-            cv2.circle(self.dst, (self.cX_container, self.cY_container), 1, (255, 0, 0), -1)
+            cv2.drawContours(self.dst, [cnt], 0, (0, 128, 255), 1)
+            cv2.circle(self.dst, (self.cX_container, self.cY_container), 1, (0, 128, 255), -1)
 
     def qr_decoder(self):
         self.qr_centres.clear()
