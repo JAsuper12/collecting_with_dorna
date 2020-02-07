@@ -77,7 +77,7 @@ class Camera:
 
             self.detect_colors()
 
-            #self.qr_decoder()
+            self.qr_decoder()
 
             cv2.imshow("camera", self.dst)
             cv2.imshow("blue_only", self.show_blue_color)
@@ -138,14 +138,13 @@ class Camera:
             area = cv2.contourArea(con)
             approx = cv2.approxPolyDP(con, 0.01 * perimeter, True)
 
-            '''circularity = 4 * m.pi * (area / (perimeter * perimeter))
-            if 0.75 < circularity < 1.5:
-                contours_circles.append(con)'''
+            circularity = 4 * m.pi * (area / (perimeter ** 2))
 
             if len(approx) == 4 and not self.found_container:
                 # compute the bounding box of the contour
                 self.contours_rectangle.append(con)
-            else:
+
+            elif 0.8 < circularity:
                 contours_circles.append(con)
 
         for cnt in contours_circles:
@@ -240,24 +239,15 @@ class Camera:
         else:
             valid_qr_spread = False
 
-
-        # print(self.world_points, self.qr_centres)
-
-        # print(self.world_points)
-        # print(self.localization_qr_codes)
-        # print(nr_qr_codes)
         if len(self.qr_centres) >= 4 and valid_qr_spread:
-            # print(world_points)
             self.image_points_of_qr_codes = np.array(self.qr_centres, dtype="float")
-            # print(world_points)
-            # print(self.image_points_of_qr_codes)
 
             _, self.rvecs, self.tvecs = cv2.solvePnP(world_points, self.image_points_of_qr_codes, self.camera_matrix, self.dist_coeff)
 
             self.origin, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-            z_axis, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 10.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-            x_axis, jacobian = cv2.projectPoints(np.array([(10.0, 0.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-            y_axis, jacobian = cv2.projectPoints(np.array([(0.0, 10.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+            z_axis, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 55.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+            x_axis, jacobian = cv2.projectPoints(np.array([(55.0, 0.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+            y_axis, jacobian = cv2.projectPoints(np.array([(0.0, 55.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             axis = [x_axis, y_axis, z_axis]
 
             i = 0
