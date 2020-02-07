@@ -82,7 +82,6 @@ class PublishCoordinates:
 
             self.qr_decoder()
 
-            cv2.imshow("blue_only", self.show_blue_color)
             cv2.imshow("camera", self.dst)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -134,14 +133,14 @@ class PublishCoordinates:
             area = cv2.contourArea(con)
             approx = cv2.approxPolyDP(con, 0.04 * perimeter, True)
 
-            if perimeter == 0:
-                break
             circularity = 4 * m.pi * (area / (perimeter * perimeter))
 
-            if 0.75 < circularity < 1.5:
-                contours_circles.append(con)
-            elif len(approx) == 4 and not self.found_container:
+            if len(approx) == 4 and not self.found_container:
+                # compute the bounding box of the contour
                 self.contours_rectangle.append(con)
+
+            elif 0.8 < circularity:
+                contours_circles.append(con)
 
         for cnt in contours_circles:
             M = cv2.moments(cnt)
@@ -157,8 +156,8 @@ class PublishCoordinates:
             self.cX_container = int(M["m10"] / M["m00"])
             self.cY_container = int(M["m01"] / M["m00"])
             self.container_position.append((self.cX_container, self.cY_container))
-            cv2.drawContours(self.dst, [cnt], 0, (255, 0, 0), 1)
-            cv2.circle(self.dst, (self.cX_container, self.cY_container), 1, (255, 0, 0), -1)
+            cv2.drawContours(self.dst, [cnt], 0, (0, 128, 255), 1)
+            cv2.circle(self.dst, (self.cX_container, self.cY_container), 1, (0, 128, 255), -1)
 
     def qr_decoder(self):
         self.qr_centres.clear()
