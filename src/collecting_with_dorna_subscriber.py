@@ -58,6 +58,8 @@ class Subscriber:
             y_c = container_coordinate[1]
             z_c = 0
 
+            print("Behälterposition: ", x_c, y_c)
+
         ball_coordinate = self.coordinates_msg.ball_coordinates
 
         balls_array = []
@@ -68,11 +70,17 @@ class Subscriber:
                 x_b, y_b = ball_coordinate[i], ball_coordinate[i + 1]
                 z_b = 0
 
+                print("Ballposition: ", x_b, y_b)
+
                 five_above_ball = JointValue(x_b, y_b, z_b + 5)
                 one_above_ball = JointValue(x_b, y_b, z_b + 1)
 
-                five_above_ball_result = five_above_ball.calc_joint_values()
-                one_above_ball_result = one_above_ball.calc_joint_values()
+                try:
+                    five_above_ball_result = five_above_ball.calc_joint_values()
+                    one_above_ball_result = one_above_ball.calc_joint_values()
+                except ValueError:
+                    print("Ball außerhalb des Bereiches")
+                    continue
 
                 five_above_ball_array = self.get_joints(five_above_ball_result)
                 one_above_ball_array = self.get_joints(one_above_ball_result)
@@ -81,8 +89,15 @@ class Subscriber:
 
                 balls_array.append(balls_dict)
 
+
+
             ten_above_container = JointValue(x_c, y_c, z_c + 10)
-            ten_above_container_result = ten_above_container.calc_joint_values()
+
+            try:
+                ten_above_container_result = ten_above_container.calc_joint_values()
+            except ValueError:
+                print("Behälter außerhalb des Bereiches")
+
             ten_above_container_array = self.get_joints(ten_above_container_result)
 
             for i in balls_array:
@@ -98,10 +113,10 @@ class Subscriber:
                 self.move_dorna(ten_above_container_array)
                 self.open_gripper()
 
-            print(self.coordinates_msg.ball_coordinates)
-
         else:
-            print("Konnte keine Bälle orten")
+            print("Konnte keine Bälle orten, versuche erneut")
+            rospy.sleep(1)
+            self.collect_balls()
 
     def terminate(self):
         self.robot.terminate()
@@ -138,3 +153,5 @@ if __name__ == '__main__':
 
             elif _input == "y":
                 break
+
+    dorna.terminate()
