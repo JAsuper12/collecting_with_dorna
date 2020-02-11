@@ -1,0 +1,13 @@
+<launch>
+    <node
+    pkg="collecting_with_dorna"
+    type="collecting_with_dorna_publisher.py"
+    name="coordinates_publisher"
+    output="screen" />
+
+    <node
+    pkg="collecting_with_dorna"
+    type="collecting_with_dorna_subscriber.py"
+    name="coordinates_subscriber"
+    output="screen" />
+</launch>
