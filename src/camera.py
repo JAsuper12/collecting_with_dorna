@@ -70,8 +70,8 @@ class Camera:
             frame = np.reshape(array, (self.height.value, self.width.value, self.bytes_per_pixel))
             frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
             size = (self.height, self.width)
-            new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(self.camera_matrix, self.dist_coeff, size, 1, size)
-            dst = cv2.undistort(frame, self.camera_matrix, self.dist_coeff, None, new_camera_matrix)
+            self.new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(self.camera_matrix, self.dist_coeff, size, 1, size)
+            dst = cv2.undistort(frame, self.camera_matrix, self.dist_coeff, None, self.new_camera_matrix)
             x, y, w, h = roi
             self.dst = dst[y:y + h, x:x + w]
 
@@ -86,22 +86,24 @@ class Camera:
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-            elif cv2.waitKey(1) & 0xFF == ord('t'):
-                cv2.imwrite("/home/lennart/dorna/camera/images/image.bmp", self.dst)
-                cv2.imwrite("/home/lennart/dorna/camera/images/mask.bmp", self.show_blue_color)
+            elif cv2.waitKey(100) & 0xFF == ord('t'):
+                cv2.imwrite("C:\dorna\camera\images\image.bmp", self.dst)
+                cv2.imwrite("C:\dorna\camera\images\mask.bmp", self.show_blue_color)
+
+            elif cv2.waitKey(100) & 0xFF == ord('l'):
+                self.found_container = False
+                self.container_world_position.clear()
 
         ueye.is_FreeImageMem(self.h_cam, self.pcImageMemory, self.MemID)
         ueye.is_ExitCamera(self.h_cam)
         cv2.destroyAllWindows()
 
     def load_calibration_config(self):
-        with open("/home/lennart/dorna/camera/camera_calibration_config.json", "r") as file:
+        with open("C:\dorna\camera\camera_calibration_config.json", "r") as file:
             data = json.load(file)
             self.camera_matrix = np.array(data["camera_matrix"])
             self.dist_coeff = np.array(data["dist_coeff"])
             self.mean_error = data["mean_error"]
-            # print(self.camera_matrix)
-            # print(self.dist_coeff)
 
     def detect_colors(self):
         # create NumPy arrays from the boundaries
@@ -244,11 +246,14 @@ class Camera:
 
             _, self.rvecs, self.tvecs = cv2.solvePnP(world_points, self.image_points_of_qr_codes, self.camera_matrix, self.dist_coeff)
 
+            self.rmatrix = cv2.Rodrigues(self.rvecs)[0]
+
             self.origin, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             z_axis, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 55.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             x_axis, jacobian = cv2.projectPoints(np.array([(55.0, 0.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             y_axis, jacobian = cv2.projectPoints(np.array([(0.0, 55.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             axis = [x_axis, y_axis, z_axis]
+
 
             i = 0
             for x in axis:
@@ -283,24 +288,16 @@ class Camera:
                     n_distance = n_distance + 1
                 distance_balls_to_qr_code.append(distance)
                 i = i + 1
-            # print(distance_balls_to_qr_code)
-
-            # print(self.world_localization_qr_codes)
-
-            # print(self.ball_position)
 
             if len(self.ball_position) > 0:
                 math_error = False
                 world_distance_origin_to_qr_code = []
                 for [x, y, z] in self.world_localization_qr_codes:
                     world_distance_origin_to_qr_code.append(m.sqrt(x ** 2 + y ** 2))
-                # print(world_distance_origin_to_qr_code)
 
                 image_distance_origin_to_qr_code = []
-                # print(self.localization_qr_codes)
                 for [u, v] in self.localization_qr_codes:
                     image_distance_origin_to_qr_code.append(m.sqrt((u - self.origin[0][0][0]) ** 2 + (v - self.origin[0][0][1]) ** 2))
-                # print(image_distance_origin_to_qr_code)
 
                 cm_per_pixel = []
                 for distance in range(3):
@@ -314,7 +311,6 @@ class Camera:
                     y = self.world_localization_qr_codes[j][1]
                     r = (distance_balls_to_qr_code[0][j] * cm_per_pixel[j])
                     equations.append([x, y, r])
-                # print(equations)
 
                 x_y_coordinates = []
                 for i in range(3):
@@ -373,11 +369,10 @@ class Camera:
                         place_of_similar_x_coordinates = [0]
                         place_of_similar_y_coordinates = [0]
                         n = 1
-                        # print("x_y", x_y_coordinates)
+
                         if index_error:
                             break
                         while not found_similar_y_coordinates:
-                            # print(n)
                             try:
                                 difference = x_y_coordinates[0][1] - x_y_coordinates[n][1]
                             except IndexError:
@@ -428,8 +423,6 @@ class Camera:
                                     found_similar_x_coordinates = True
                                     coordinates_found = True
 
-                    # print(similar_coordinates)
-
                     if not index_error:
                         sum_x_coordinates = 0
                         sum_y_coordinates = 0
@@ -446,6 +439,7 @@ class Camera:
 
     def get_ball_position_with_grid(self):
         ball_world_positions = []
+
         for ball in self.ball_position:
             y_coordinate_of_smallest_difference = []
             x_b, y_b = ball
@@ -457,7 +451,7 @@ class Camera:
                 while y <= 60:
                     image_coordinate, jacobian = cv2.projectPoints(np.array([(x, y, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
                     y_difference.append([y, y_b - image_coordinate[0][0][1]])
-                    # print(y_difference)
+
                     if len(y_difference) == 2:
                         if 0 < y_difference[0][1] < y_difference[1][1] or y_difference[1][1] < y_difference[0][1] < 0:
                             y_difference.remove(y_difference[1])
@@ -466,12 +460,11 @@ class Camera:
                     y = y + self.increment
                 y_coordinate_of_smallest_difference.append(y_difference[0][0])
                 x = x + self.increment
-            # print(y_coordinate_of_smallest_difference)
+
             for y in range(len(y_coordinate_of_smallest_difference)):
                 image_coordinate, jacobian = cv2.projectPoints(np.array([(y * self.increment - 60, y_coordinate_of_smallest_difference[y], 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-                # print(image_coordinate, self.ball_position)
                 x_difference.append([y * self.increment - 60, y_coordinate_of_smallest_difference[y], x_b - image_coordinate[0][0][0]])
-                # print(x_difference)
+
                 if len(x_difference) == 2:
                     if 0 < x_difference[0][2] < x_difference[1][2] or x_difference[1][2] < x_difference[0][2] < 0:
                         x_difference.remove(x_difference[1])
@@ -499,7 +492,7 @@ class Camera:
                     image_coordinate, jacobian = cv2.projectPoints(np.array([(x, y, 0.0)]), self.rvecs, self.tvecs,
                                                                    self.camera_matrix, self.dist_coeff)
                     y_difference.append([y, y_b - image_coordinate[0][0][1]])
-                    # print(y_difference)
+
                     if len(y_difference) == 2:
                         if 0 < y_difference[0][1] < y_difference[1][1] or y_difference[1][1] < y_difference[0][1] < 0:
                             y_difference.remove(y_difference[1])
@@ -508,15 +501,14 @@ class Camera:
                     y = y + self.increment
                 y_coordinate_of_smallest_difference.append(y_difference[0][0])
                 x = x + self.increment
-            # print(y_coordinate_of_smallest_difference)
+
             for y in range(len(y_coordinate_of_smallest_difference)):
                 image_coordinate, jacobian = cv2.projectPoints(
                     np.array([(y * self.increment - 60, y_coordinate_of_smallest_difference[y], 0.0)]), self.rvecs, self.tvecs,
                     self.camera_matrix, self.dist_coeff)
-                # print(image_coordinate, self.ball_position)
                 x_difference.append(
                     [y * self.increment - 60, y_coordinate_of_smallest_difference[y], x_b - image_coordinate[0][0][0]])
-                # print(x_difference)
+
                 if len(x_difference) == 2:
                     if 0 < x_difference[0][2] < x_difference[1][2] or x_difference[1][2] < x_difference[0][2] < 0:
                         x_difference.remove(x_difference[1])
@@ -525,43 +517,45 @@ class Camera:
 
             self.container_world_position.append((x_difference[0][0], x_difference[0][1]))
             self.found_container = True
-            '''y = x_difference[0][1] - self.increment
-            x = x_difference[0][0] - self.increment
-            y_cm_per_pixel = []
-            x_cm_per_pixel = []
-            while y < x_difference[0][1] + self.increment:
-                x_1, jacobian = cv2.projectPoints(np.array([(x_difference[0][0] - self.increment, y, 0.0)]),
-                                                  self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-                x_2, jacobian = cv2.projectPoints(np.array([(x_difference[0][0] + self.increment, y, 0.0)]),
-                                                  self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-                y_cm_per_pixel.append(5 / m.sqrt((x_1[0][0][0] - x_2[0][0][0]) ** 2 + (x_1[0][0][1] - x_2[0][0][1]) ** 2))
-                y = y + 0.1
-            while x < x_difference[0][0] + self.increment:
-                y_1, jacobian = cv2.projectPoints(np.array([(x, x_difference[0][1] - self.increment, 0.0)]),
-                                                  self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-                y_2, jacobian = cv2.projectPoints(np.array([(x, x_difference[0][1] + self.increment, 0.0)]),
-                                                  self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-                x_cm_per_pixel.append(5 / m.sqrt((y_1[0][0][0] - y_2[0][0][0]) ** 2 + (y_1[0][0][1] - y_2[0][0][1]) ** 2))
-                x = x + 0.1
 
-            # print(image_coordinate, self.ball_position)
-            sum = 0
-            for j in y_cm_per_pixel:
-                sum = sum + j
-            average_y_cm_per_pixel = sum / len(y_cm_per_pixel)
-            # print(average_cm_per_pixel)
-
-            sum = 0
-            for j in x_cm_per_pixel:
-                sum = sum + j
-            average_x_cm_per_pixel = sum / len(x_cm_per_pixel)
-            # print(average_cm_per_pixel)
-
-            i_x = (x_b - image_coordinate[0][0][0]) * average_x_cm_per_pixel
-            i_y = (y_b - image_coordinate[0][0][1]) * average_y_cm_per_pixel
-            radius = m.sqrt(i_x ** 2 + i_y ** 2)
-            print(radius)'''
         print("Positionen der Bälle: ", ball_world_positions, "\nPosition des Behälters: ", self.container_world_position)
+
+    def get_ball_position_with_matrix(self):
+        if len(self.ball_position) > 0:
+            u, v = self.ball_position[0]
+            uv_1 = np.array([[u, v, 1]], dtype=np.float32)
+            uv_1 = uv_1.T
+            #print("uv", uv_1)
+            #print("new_camera", self.new_camera_matrix)
+            inverse_newcam_mtx = np.linalg.inv(self.new_camera_matrix)
+            #print("inv new camera", inverse_newcam_mtx)
+            #print("check", self.new_camera_matrix.dot(inverse_newcam_mtx))
+            #print("rmatr", self.rmatrix)
+            inverse_R_mtx = np.linalg.inv(self.rmatrix)
+            #print("inv rmatr", inverse_R_mtx)
+            #print("check", self.rmatrix.dot(inverse_R_mtx))
+            #print("t", self.tvecs)
+
+            Rt = inverse_R_mtx.dot(self.tvecs)
+            #print("Rt", Rt)
+            RM = inverse_R_mtx.dot(inverse_newcam_mtx)
+            #print("RM", RM)
+            RMuv = RM.dot(uv_1)
+            #print("RMuv", RMuv)
+
+            s = (0 + Rt[2]) / RMuv[2]
+
+            suv_1 = s*uv_1
+
+            xyz_c = inverse_newcam_mtx.dot(suv_1)
+            xyz_c = xyz_c - self.tvecs
+            #print("s", s)
+
+            a = s*inverse_newcam_mtx.dot(uv_1) - self.tvecs
+
+            #print("a", a)
+            XYZ = inverse_R_mtx.dot(a)
+            print(XYZ)
 
 
 if __name__ == "__main__":
