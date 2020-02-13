@@ -4,7 +4,7 @@ from calculate_joint_values import JointValue, Input
 
 class MoveDorna:
     def __init__(self):
-        self.robot = Dorna("/home/lennart/dorna/dorna/my_config.yaml")
+        self.robot = Dorna("C:\dorna\dorna\my_config.yaml")
         self.robot.connect()
 
     def home(self):
@@ -27,7 +27,7 @@ class MoveDorna:
             proceed = False
 
             while not proceed:
-                _input = input("j3 auf 0 setzen? (y/n)")
+                _input = input("j3 und j4 auf 0 setzen? (y/n)")
 
                 if _input == "y":
                     proceed = True
@@ -71,6 +71,7 @@ class MoveDorna:
     def collect_balls(self):
         n = eval(input("Anzahl der Bälle: "))
         balls_array = []
+        out_of_range = False
         for j in range(n):
             print("Position des", j + 1, ". Balls:")
             i = Input()
@@ -84,6 +85,10 @@ class MoveDorna:
 
             five_above_ball_result = five_above_ball.calc_joint_values()
             one_above_ball_result = one_above_ball.calc_joint_values()
+
+            if five_above_ball == 1 or one_above_ball == 1:
+                out_of_range = True
+                break
 
             five_above_ball_array = self.get_joints(five_above_ball_result)
             one_above_ball_array = self.get_joints(one_above_ball_result)
@@ -101,45 +106,54 @@ class MoveDorna:
 
         ten_above_container = JointValue(x, y, z + 10)
         ten_above_container_result = ten_above_container.calc_joint_values()
+
+        if five_above_ball == 1 or one_above_ball == 1:
+            out_of_range = True
+
         ten_above_container_array = self.get_joints(ten_above_container_result)
 
         print(balls_array)
         balls_array_len = len(balls_array)
-        for x in range(balls_array_len):
-            print(balls_array[x])
-        print(ten_above_container_array)
-        proceed = True
 
-        while proceed:
-            _input = input("Bewegung ausführen? (y/n)")
+        if not out_of_range:
+            for x in range(balls_array_len):
+                print(balls_array[x])
+            print(ten_above_container_array)
+            proceed = True
 
-            if _input == "n":
-                proceed = False
+            while proceed:
+                _input = input("Bewegung ausführen? (y/n)")
 
-            elif _input == "y":
-                break
+                if _input == "n":
+                    proceed = False
 
-        if proceed:
-            for i in range(n):
-                first = balls_array[i].get("1.")
-                second = balls_array[i].get("2.")
-                third = balls_array[i].get("3.")
+                elif _input == "y":
+                    break
 
-                self.open_gripper()
-                self.move_dorna(first)
-                self.move_dorna(second)
-                self.close_gripper()
-                self.move_dorna(third)
-                self.move_dorna(ten_above_container_array)
-                self.open_gripper()
+            if proceed:
+                for i in range(n):
+                    first = balls_array[i].get("1.")
+                    second = balls_array[i].get("2.")
+                    third = balls_array[i].get("3.")
 
-            print("Bewegung ausgeführt.")
+                    self.open_gripper()
+                    self.move_dorna(first)
+                    self.move_dorna(second)
+                    self.close_gripper()
+                    self.move_dorna(third)
+                    self.move_dorna(ten_above_container_array)
+                    self.open_gripper()
+
+                print("Bewegung ausgeführt.")
+
+        else:
+            print("Bewegung konnte nicht ausgeführt werden")
 
     def terminate(self):
         self.robot.terminate()
 
     def close_gripper(self):
-        self.robot.set_io({"servo": 675})
+        self.robot.set_io({"servo": 700})
 
     def open_gripper(self):
         self.robot.set_io({"servo": 0})
