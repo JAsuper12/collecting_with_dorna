@@ -47,6 +47,7 @@ class Camera:
         self.localization_qr_codes = []
         self.world_localization_qr_codes = []
         self.increment = 0.25
+        self.results = 0
 
     def show_image(self):
         nRet = ueye.is_InitCamera(self.h_cam, None)
@@ -266,7 +267,7 @@ class Camera:
                 elif i == 2:
                     self.dst = cv2.line(self.dst, p1, p2, (0, 0, 255), 5)
                 i = i + 1
-            self.get_ball_position_with_grid()
+            self.get_ball_position_with_matrix()
 
     def get_ball_position_with_circles(self):
         if len(self.localization_qr_codes) == 3:
@@ -525,35 +526,13 @@ class Camera:
             u, v = self.ball_position[0]
             uv_1 = np.array([[u, v, 1]], dtype=np.float32)
             uv_1 = uv_1.T
-            #print("uv", uv_1)
-            #print("new_camera", self.new_camera_matrix)
             inverse_newcam_mtx = np.linalg.inv(self.new_camera_matrix)
-            #print("inv new camera", inverse_newcam_mtx)
-            #print("check", self.new_camera_matrix.dot(inverse_newcam_mtx))
-            #print("rmatr", self.rmatrix)
             inverse_R_mtx = np.linalg.inv(self.rmatrix)
-            #print("inv rmatr", inverse_R_mtx)
-            #print("check", self.rmatrix.dot(inverse_R_mtx))
-            #print("t", self.tvecs)
-
             Rt = inverse_R_mtx.dot(self.tvecs)
-            #print("Rt", Rt)
             RM = inverse_R_mtx.dot(inverse_newcam_mtx)
-            #print("RM", RM)
             RMuv = RM.dot(uv_1)
-            #print("RMuv", RMuv)
-
             s = (0 + Rt[2]) / RMuv[2]
-
-            suv_1 = s*uv_1
-
-            xyz_c = inverse_newcam_mtx.dot(suv_1)
-            xyz_c = xyz_c - self.tvecs
-            #print("s", s)
-
             a = s*inverse_newcam_mtx.dot(uv_1) - self.tvecs
-
-            #print("a", a)
             XYZ = inverse_R_mtx.dot(a)
             print(XYZ)
 
@@ -561,3 +540,4 @@ class Camera:
 if __name__ == "__main__":
     camera = Camera()
     camera.show_image()
+    
