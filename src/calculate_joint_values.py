@@ -14,29 +14,22 @@ class JointValue:
         self.y = y
         self.h = z + self.l3 - 20.6
 
-        self.coordinates = CartToPolar(self.x, self.y)
         # umformen der eingegeben x- und y-Koordinaten in Polarkoordinaten
+        self.coordinates = CartToPolar(self.x, self.y)
         polar_coordinates = self.coordinates.calc()
+
         self.r = polar_coordinates.get("r")
+
         # s ist als der Abstand der Drehpunkte von Joint J1 und Joint J3 definiert
         self.s = math.sqrt(math.pow(self.r - 9.55 - 1, 2) + math.pow(self.h, 2))
 
+    # berechnet welche Werte die Joints annehmen müssen, um die vorgegebene Zielkoordinate zu erreichen
     def calc_joint_values(self):
-        # berechnet welche Werte die Joints annehmen müssen, um die vorgegebene Zielkoordinate zu erreichen
         polar_coordinates = self.coordinates.calc()
         psi = polar_coordinates.get("psi")
 
-        # Bereich 2
-        if 26.27 <= self.r <= 41.45:
-            _z = self.l3
-            alpha_ = math.asin(self.h / self.s)
-            self.calc_angles()
-            j1 = self.alpha + alpha_
-            j2 = -math.pi + self.beta
-            j3 = -(math.pi / 2) - j1 - j2
-
         # Bereich 1
-        elif self.r < 26.27:
+        if self.r < 26.27:
             l = 26.27 - self.r
             _z = math.sqrt(math.pow(self.l3, 2) - math.pow(l, 2))
             h_j3 = self.h + _z - self.l3
@@ -48,18 +41,31 @@ class JointValue:
             j2 = -math.pi + self.beta
             j3 = -(math.pi / 2) - gamma - j1 - j2
 
+        # Bereich 2
+        elif 26.27 <= self.r <= 41.45:
+            _z = self.l3
+            alpha_ = math.asin(self.h / self.s)
+            self.calc_angles()
+            j1 = self.alpha + alpha_
+            j2 = -math.pi + self.beta
+            j3 = -(math.pi / 2) - j1 - j2
+
         # Bereich 3
         elif self.r > 41.45:
             l = self.r - 41.45
             _z = math.sqrt(math.pow(self.l3, 2) - math.pow(l, 2))
             h_j3 = self.h + _z - self.l3
-            self.s = math.sqrt(math.pow(30.9, 2) + math.pow(h_j3, 2)) # + 1
+            self.s = math.sqrt(math.pow(30.9, 2) + math.pow(h_j3, 2))# + 1
             self.calc_angles()
             alpha_ = math.asin(h_j3 / self.s)
             gamma = math.acos(_z / self.l3)
             j1 = self.alpha + alpha_
             j2 = -math.pi + self.beta
             j3 = -(math.pi / 2) + gamma - j1 - j2
+
+        else:
+            print("Objekt liegt außerhalb der Reichweite")
+            return 1
 
         # umformen vom Radiant in Grad
         j1_degrees = math.degrees(j1)
