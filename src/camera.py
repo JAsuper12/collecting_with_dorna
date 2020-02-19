@@ -26,20 +26,28 @@ class Camera:
         self.load_calibration_config()
 
         # Variabeln zur Farberkennung
-        self.found_container = False
-        self.contours_rectangle = []
+        self.found_blue_container = False
+        self.found_red_container = False
+        self.blue_contours_rectangle = []
+        self.red_contours_rectangle = []
         blue_lower = [51, 0, 0]
         blue_upper = [255, 62, 62]
-        self.boundaries = [(blue_lower, blue_upper)]
+        red_lower = [0, 0, 51]
+        red_upper = [62, 62, 255]
+        self.blue_boundaries = [(blue_lower, blue_upper)]
+        self.red_boundaries = [(red_lower, red_upper)]
         self.cX = None
         self.cY = None
         self.cX_container = None
         self.cY_container = None
 
         # Variablen zur Positionierung
-        self.container_world_position = []
-        self.ball_position = []
-        self.container_position = []
+        self.blue_container_world_position = []
+        self.red_container_world_position = []
+        self.blue_ball_position = []
+        self.red_ball_position = []
+        self.blue_container_position = []
+        self.red_container_position = []
         self.qr_centres = []
         self.world_points = []
         self.qr_codes = None
@@ -77,11 +85,10 @@ class Camera:
             self.dst = dst[y:y + h, x:x + w]
 
             self.detect_colors()
-
             self.extrinsic_calibration()
-
             cv2.imshow("camera", self.dst)
             cv2.imshow("blue_only", self.show_blue_color)
+            cv2.imshow("red_only", self.show_red_color)
 
             # Kamera schließen
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -89,11 +96,14 @@ class Camera:
 
             elif cv2.waitKey(100) & 0xFF == ord('t'):
                 cv2.imwrite("C:\dorna\camera\images\image.bmp", self.dst)
-                cv2.imwrite("C:\dorna\camera\images\mask.bmp", self.show_blue_color)
+                cv2.imwrite("C:\dorna\camera\images\blue_mask.bmp", self.show_blue_color)
 
             elif cv2.waitKey(100) & 0xFF == ord('l'):
-                self.found_container = False
-                self.container_world_position.clear()
+                self.found_blue_container = False
+                self.found_red_container = False
+                self.blue_container_world_position.clear()
+                self.red_container_world_position.clear()
+                print("Behälterposition zurückgesetzt")
 
         ueye.is_FreeImageMem(self.h_cam, self.pcImageMemory, self.MemID)
         ueye.is_ExitCamera(self.h_cam)
@@ -107,65 +117,120 @@ class Camera:
             self.mean_error = data["mean_error"]
 
     def detect_colors(self):
-        # create NumPy arrays from the boundaries
+        # create NumPy arrays from the blue_boundaries
         hsv = cv2.cvtColor(self.dst, cv2.COLOR_BGR2HSV)
         bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-        for (lower, upper) in self.boundaries:
+        for (lower, upper) in self.blue_boundaries:
             lower = np.array(lower)
             upper = np.array(upper)
 
-            self.mask = cv2.inRange(bgr, lower, upper)
+            self.blue_mask = cv2.inRange(bgr, lower, upper)
 
-            self.show_blue_color = cv2.bitwise_and(bgr, bgr, mask=self.mask)
-        self.draw_contours()
+            self.show_blue_color = cv2.bitwise_and(bgr, bgr, mask=self.blue_mask)
+        for (lower, upper) in self.red_boundaries:
+            lower = np.array(lower)
+            upper = np.array(upper)
 
-    def draw_contours(self):
-        self.ball_position.clear()
-        contours_area = []
-        contours_circles = []
-        contours, hierarchy = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[-2:]
+            self.red_mask = cv2.inRange(bgr, lower, upper)
 
-        if not self.found_container:
-            self.contours_rectangle.clear()
+            self.show_red_color = cv2.bitwise_and(bgr, bgr, mask=self.red_mask)
+        self.draw_blue_contours()
+        self.draw_red_contours()
+
+    def draw_blue_contours(self):
+        self.blue_ball_position.clear()
+        blue_contours_area = []
+        blue_contours_circles = []
+        blue_contours, hierarchy = cv2.findContours(self.blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[-2:]
+
+        if not self.found_blue_container:
+            self.blue_contours_rectangle.clear()
 
         # check area
-        for con in contours:
+        for con in blue_contours:
             area = cv2.contourArea(con)
             if 200 < area < 10000:
-                contours_area.append(con)
+                blue_contours_area.append(con)
 
         # check if contour is of circular shape
-        for con in contours_area:
+        for con in blue_contours_area:
             perimeter = cv2.arcLength(con, True)
             area = cv2.contourArea(con)
             approx = cv2.approxPolyDP(con, 0.01 * perimeter, True)
 
             circularity = 4 * m.pi * (area / (perimeter ** 2))
 
-            if len(approx) == 4 and not self.found_container:
+            if len(approx) == 4 and not self.found_blue_container:
                 # compute the bounding box of the contour
-                self.contours_rectangle.append(con)
+                self.blue_contours_rectangle.append(con)
 
             elif 0.8 < circularity:
-                contours_circles.append(con)
+                blue_contours_circles.append(con)
 
-        for cnt in contours_circles:
+        for cnt in blue_contours_circles:
             M = cv2.moments(cnt)
             self.cX = int(M["m10"] / M["m00"])
             self.cY = int(M["m01"] / M["m00"]) + 5
-            self.ball_position.append((self.cX, self.cY))
+            self.blue_ball_position.append((self.cX, self.cY))
 
-            cv2.drawContours(self.dst, [cnt], 0, (0, 255, 0), 1)
-            cv2.circle(self.dst, (self.cX, self.cY), 2, (0, 255, 0), -1)
+            cv2.drawContours(self.dst, [cnt], 0, (0, 0, 255), 1)
+            cv2.circle(self.dst, (self.cX, self.cY), 2, (0, 0, 255), -1)
 
-        for cnt in self.contours_rectangle:
+        for cnt in self.blue_contours_rectangle:
             M = cv2.moments(cnt)
             self.cX_container = int(M["m10"] / M["m00"])
             self.cY_container = int(M["m01"] / M["m00"])
-            self.container_position.append((self.cX_container, self.cY_container))
+            self.blue_container_position.append((self.cX_container, self.cY_container))
             cv2.drawContours(self.dst, [cnt], 0, (0, 128, 255), 1)
             cv2.circle(self.dst, (self.cX_container, self.cY_container), 1, (0, 128, 255), -1)
+
+    def draw_red_contours(self):
+        self.red_ball_position.clear()
+        red_contours_area = []
+        red_contours_circles = []
+        red_contours, hierarchy = cv2.findContours(self.red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[-2:]
+
+        if not self.found_red_container:
+            self.red_contours_rectangle.clear()
+
+        # check area
+        for con in red_contours:
+            area = cv2.contourArea(con)
+            if 200 < area < 10000:
+                red_contours_area.append(con)
+
+        # check if contour is of circular shape
+        for con in red_contours_area:
+            perimeter = cv2.arcLength(con, True)
+            area = cv2.contourArea(con)
+            approx = cv2.approxPolyDP(con, 0.01 * perimeter, True)
+
+            circularity = 4 * m.pi * (area / (perimeter ** 2))
+
+            if len(approx) == 4 and not self.found_red_container:
+                # compute the bounding box of the contour
+                self.red_contours_rectangle.append(con)
+
+            elif 0.8 < circularity:
+                red_contours_circles.append(con)
+
+        for cnt in red_contours_circles:
+            M = cv2.moments(cnt)
+            self.cX = int(M["m10"] / M["m00"])
+            self.cY = int(M["m01"] / M["m00"]) + 5
+            self.red_ball_position.append((self.cX, self.cY))
+
+            cv2.drawContours(self.dst, [cnt], 0, (255, 0, 0), 1)
+            cv2.circle(self.dst, (self.cX, self.cY), 2, (255, 0, 0), -1)
+
+        for cnt in self.red_contours_rectangle:
+            M = cv2.moments(cnt)
+            self.cX_container = int(M["m10"] / M["m00"])
+            self.cY_container = int(M["m01"] / M["m00"])
+            self.red_container_position.append((self.cX_container, self.cY_container))
+            cv2.drawContours(self.dst, [cnt], 0, (0, 255, 0), 1)
+            cv2.circle(self.dst, (self.cX_container, self.cY_container), 1, (0, 255, 0), -1)
 
     def extrinsic_calibration(self):
         self.qr_centres.clear()
@@ -206,12 +271,12 @@ class Camera:
             else:
                 negative_qr_codes = negative_qr_codes + 1
 
-        if positive_qr_codes >= 2 and negative_qr_codes >= 2:
+        if positive_qr_codes >= 3 and negative_qr_codes >= 3:
             valid_qr_spread = True
         else:
             valid_qr_spread = False
 
-        if len(self.qr_centres) >= 4 and valid_qr_spread:
+        if len(self.qr_centres) >= 6 and valid_qr_spread:
             self.image_points_of_qr_codes = np.array(self.qr_centres, dtype="float")
 
             _, self.rvecs, self.tvecs = cv2.solvePnP(world_points, self.image_points_of_qr_codes, self.camera_matrix, self.dist_coeff)
@@ -224,7 +289,6 @@ class Camera:
             y_axis, jacobian = cv2.projectPoints(np.array([(0.0, 55.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             axis = [x_axis, y_axis, z_axis]
 
-
             i = 0
             for x in axis:
                 p1 = (int(self.origin[0][0][0]), int(self.origin[0][0][1]))
@@ -236,7 +300,9 @@ class Camera:
                 elif i == 2:
                     self.dst = cv2.line(self.dst, p1, p2, (0, 0, 255), 5)
                 i = i + 1
-            self.get_ball_position_with_matrix()
+            cv2.imwrite("C:\dorna\camera\images\im.bmp", self.dst)
+            self.get_blue_ball_position_with_grid()
+            self.get_red_ball_position_with_grid()
 
     def qr_decoder(self, data, centre):
         if data == "(70, 10, 0)":
@@ -290,10 +356,10 @@ class Camera:
                 self.localization_qr_codes.append(centre)
                 self.world_localization_qr_codes.append([-20, 65, 0])
         elif data == "d":
-            self.world_points.append((-57.5, 55, 0))
+            self.world_points.append((-55, 55, 0))
             if len(self.localization_qr_codes) < 3:
                 self.localization_qr_codes.append(centre)
-                self.world_localization_qr_codes.append([-57.5, 55, 0])
+                self.world_localization_qr_codes.append([-55, 55, 0])
         elif data == "p":
             self.world_points.append((-65, 25, 0))
             if len(self.localization_qr_codes) < 3:
@@ -329,14 +395,23 @@ class Camera:
             if len(self.localization_qr_codes) < 3:
                 self.localization_qr_codes.append(centre)
                 self.world_localization_qr_codes.append([-55, -10, 0])
+        elif data == "k":
+            self.world_points.append((47.5, 10, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([47.5, 10, 0])
+        elif data == "l":
+            self.world_points.append((0, 35, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([0, 35, 0])
 
     def get_ball_position_with_circles(self):
         if len(self.localization_qr_codes) == 3:
             distance_balls_to_qr_code = []
 
-            # print(len(self.ball_position))
             i = 0
-            for (ball_x, ball_y) in self.ball_position:
+            for (ball_x, ball_y) in self.blue_ball_position:
                 distance = []
                 n_distance = 0
                 for (qr_x, qr_y) in self.localization_qr_codes:
@@ -351,7 +426,7 @@ class Camera:
                 distance_balls_to_qr_code.append(distance)
                 i = i + 1
 
-            if len(self.ball_position) > 0:
+            if len(self.blue_ball_position) > 0:
                 math_error = False
                 world_distance_origin_to_qr_code = []
                 for [x, y, z] in self.world_localization_qr_codes:
@@ -499,10 +574,10 @@ class Camera:
 
                         print(ball_coordinate)
 
-    def get_ball_position_with_grid(self):
-        ball_world_positions = []
+    def get_blue_ball_position_with_grid(self):
+        blue_ball_world_positions = []
 
-        for ball in self.ball_position:
+        for ball in self.blue_ball_position:
             y_coordinate_of_smallest_difference = []
             x_b, y_b = ball
             x = -60
@@ -533,18 +608,18 @@ class Camera:
                     else:
                         x_difference.remove(x_difference[0])
 
-            ball_world_positions.append((x_difference[0][0], x_difference[0][1]))
+            blue_ball_world_positions.append((x_difference[0][0], x_difference[0][1]))
 
-        for balls in ball_world_positions:
+        for balls in blue_ball_world_positions:
             image_coordinate, jacobian = cv2.projectPoints(
                 np.array([(x_difference[0][0], x_difference[0][1], 0.0)]), self.rvecs, self.tvecs,
                 self.camera_matrix, self.dist_coeff)
             estimated_point = (int(image_coordinate[0][0][0]), int(image_coordinate[0][0][1]))
             cv2.circle(self.dst, estimated_point, 2, (0, 0, 255), -1)
 
-        if not self.found_container and len(self.container_position) > 0:
+        if not self.found_blue_container and len(self.blue_container_position) > 0:
             y_coordinate_of_smallest_difference = []
-            x_b, y_b = self.container_position[0]
+            x_b, y_b = self.blue_container_position[0]
             x = -60
             x_difference = []
             while x <= 60:
@@ -577,14 +652,97 @@ class Camera:
                     else:
                         x_difference.remove(x_difference[0])
 
-            self.container_world_position.append((x_difference[0][0], x_difference[0][1]))
-            self.found_container = True
+            self.blue_container_world_position.append((x_difference[0][0], x_difference[0][1]))
+            self.found_blue_container = True
 
-        print("Positionen der Bälle: ", ball_world_positions, "\nPosition des Behälters: ", self.container_world_position)
+        print("Positionen der blauen Bälle: ", blue_ball_world_positions, "\nPosition des blauen Behälters: ", self.blue_container_world_position)
+
+    def get_red_ball_position_with_grid(self):
+        red_ball_world_positions = []
+
+        for ball in self.red_ball_position:
+            y_coordinate_of_smallest_difference = []
+            x_b, y_b = ball
+            x = -60
+            x_difference = []
+            while x <= 60:
+                y = -10
+                y_difference = []
+                while y <= 60:
+                    image_coordinate, jacobian = cv2.projectPoints(np.array([(x, y, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+                    y_difference.append([y, y_b - image_coordinate[0][0][1]])
+
+                    if len(y_difference) == 2:
+                        if 0 < y_difference[0][1] < y_difference[1][1] or y_difference[1][1] < y_difference[0][1] < 0:
+                            y_difference.remove(y_difference[1])
+                        else:
+                            y_difference.remove(y_difference[0])
+                    y = y + self.increment
+                y_coordinate_of_smallest_difference.append(y_difference[0][0])
+                x = x + self.increment
+
+            for y in range(len(y_coordinate_of_smallest_difference)):
+                image_coordinate, jacobian = cv2.projectPoints(np.array([(y * self.increment - 60, y_coordinate_of_smallest_difference[y], 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+                x_difference.append([y * self.increment - 60, y_coordinate_of_smallest_difference[y], x_b - image_coordinate[0][0][0]])
+
+                if len(x_difference) == 2:
+                    if 0 < x_difference[0][2] < x_difference[1][2] or x_difference[1][2] < x_difference[0][2] < 0:
+                        x_difference.remove(x_difference[1])
+                    else:
+                        x_difference.remove(x_difference[0])
+
+            red_ball_world_positions.append((x_difference[0][0], x_difference[0][1]))
+
+        for balls in red_ball_world_positions:
+            image_coordinate, jacobian = cv2.projectPoints(
+                np.array([(x_difference[0][0], x_difference[0][1], 0.0)]), self.rvecs, self.tvecs,
+                self.camera_matrix, self.dist_coeff)
+            estimated_point = (int(image_coordinate[0][0][0]), int(image_coordinate[0][0][1]))
+            cv2.circle(self.dst, estimated_point, 2, (0, 0, 255), -1)
+
+        if not self.found_red_container and len(self.red_container_position) > 0:
+            y_coordinate_of_smallest_difference = []
+            x_b, y_b = self.red_container_position[0]
+            x = -60
+            x_difference = []
+            while x <= 60:
+                y = -10
+                y_difference = []
+                while y <= 60:
+                    image_coordinate, jacobian = cv2.projectPoints(np.array([(x, y, 0.0)]), self.rvecs, self.tvecs,
+                                                                   self.camera_matrix, self.dist_coeff)
+                    y_difference.append([y, y_b - image_coordinate[0][0][1]])
+
+                    if len(y_difference) == 2:
+                        if 0 < y_difference[0][1] < y_difference[1][1] or y_difference[1][1] < y_difference[0][1] < 0:
+                            y_difference.remove(y_difference[1])
+                        else:
+                            y_difference.remove(y_difference[0])
+                    y = y + self.increment
+                y_coordinate_of_smallest_difference.append(y_difference[0][0])
+                x = x + self.increment
+
+            for y in range(len(y_coordinate_of_smallest_difference)):
+                image_coordinate, jacobian = cv2.projectPoints(
+                    np.array([(y * self.increment - 60, y_coordinate_of_smallest_difference[y], 0.0)]), self.rvecs, self.tvecs,
+                    self.camera_matrix, self.dist_coeff)
+                x_difference.append(
+                    [y * self.increment - 60, y_coordinate_of_smallest_difference[y], x_b - image_coordinate[0][0][0]])
+
+                if len(x_difference) == 2:
+                    if 0 < x_difference[0][2] < x_difference[1][2] or x_difference[1][2] < x_difference[0][2] < 0:
+                        x_difference.remove(x_difference[1])
+                    else:
+                        x_difference.remove(x_difference[0])
+
+            self.red_container_world_position.append((x_difference[0][0], x_difference[0][1]))
+            self.found_red_container = True
+
+        print("Positionen der roten Bälle: ", red_ball_world_positions, "\nPosition des roten Behälters: ", self.red_container_world_position)
 
     def get_ball_position_with_matrix(self):
-        if len(self.ball_position) > 0:
-            u, v = self.ball_position[0]
+        if len(self.blue_ball_position) > 0:
+            u, v = self.blue_ball_position[0]
             uv_1 = np.array([[u, v, 1]], dtype=np.float32)
             uv_1 = uv_1.T
             inverse_newcam_mtx = np.linalg.inv(self.new_camera_matrix)
