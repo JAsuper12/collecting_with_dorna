@@ -1,5 +1,5 @@
 import math
-from cartesian_to_polar import CartToPolar
+from cartesian_to_polar import CartesianToPolar
 import numpy
 
 
@@ -15,7 +15,7 @@ class JointValue:
         self.h = z + self.l3 - 20.6
 
         # umformen der eingegeben x- und y-Koordinaten in Polarkoordinaten
-        self.coordinates = CartToPolar(self.x, self.y)
+        self.coordinates = CartesianToPolar(self.x, self.y)
         polar_coordinates = self.coordinates.calc()
 
         self.r = polar_coordinates.get("r")
@@ -52,10 +52,11 @@ class JointValue:
 
         # Bereich 3
         elif self.r > 41.45:
+            self.l3 = 15
             l = self.r - 41.45
             _z = math.sqrt(math.pow(self.l3, 2) - math.pow(l, 2))
             h_j3 = self.h + _z - self.l3
-            self.s = math.sqrt(math.pow(30.9, 2) + math.pow(h_j3, 2))# + 1
+            self.s = math.sqrt(math.pow(30.9, 2) + math.pow(h_j3, 2))
             self.calc_angles()
             alpha_ = math.asin(h_j3 / self.s)
             gamma = math.acos(_z / self.l3)
@@ -74,29 +75,28 @@ class JointValue:
 
         return {"j0": psi + 90, "j1": j1_degrees, "j2": j2_degrees, "j3": j3_degrees, "_z": _z}
 
+    # Berechnet die Winkel alpha und beta mit Hilfe des allgemeinen Kosinussatzes
     def calc_angles(self):
-        # Berechnet die Winkel alpha und beta mit Hilfe des allgemeinen Kosinussatzes
         self.alpha = math.acos((math.pow(self.s, 2) - math.pow(self.l2, 2) + math.pow(self.l1, 2)) / (2 * self.l1 * self.s))
         self.beta = math.acos((-math.pow(self.s, 2) + math.pow(self.l2, 2) + math.pow(self.l1, 2)) / (2 * self.l1 * self.l2))
 
+    # Berechnet in welchen Bereich der Wert für y liegen sollten, nachdem der Wert für x eingegeben wurde,
+    # damit der Roboterarm diesen noch erreichen kann
     def calc_y_range(self):
-        '''Berechnet in welchen Bereich der Wert für y liegen sollten, nachdem der Wert für x eingegeben wurde,
-        damit der Roboterarm diesen noch erreichen kann, '''
         if 9.54 > self.x > -9.54:
             y_min = math.sqrt(math.pow(9.54, 2) - math.pow(self.x, 2))
         else:
             y_min = -3.4
 
-        y_max = math.sqrt(math.pow(58.18, 2) - math.pow(self.x, 2))
+        y_max = math.sqrt(math.pow(56.14, 2) - math.pow(self.x, 2))
 
         if y_max < 3.4:
             y_min = -y_max
         return {"y_min": y_min, "y_max": y_max}
 
+    # Berechnet in welchen Bereich der Wert für z liegen sollten, nachdem die Werte für x und y eingegeben wurden,
+    # damit der Roboterarm diesen noch erreichen kann
     def calc_z_range(self, _z):
-        '''Berechnet in welchen Bereich der Wert für z liegen sollten, nachdem die Werte für x und y eingegeben wurden,
-        damit der Roboterarm diesen noch erreichen kann'''
-
         if 20 < self.r < 26.27:
             z_max = 52.4 - _z
             z_max = int(z_max)
@@ -115,7 +115,7 @@ class JointValue:
             z_max = math.sqrt(math.pow(35.56, 2) - math.pow(self.s, 2)) + 3.6
 
         elif self.r > 41.45:
-            z_max = 38.2 - _z
+            z_max = 34.2 - _z
 
         z_min = 0
 
@@ -124,12 +124,12 @@ class JointValue:
 
 class Input:
     def input_values(self):
-        print("Zulässiger Radius: 9,54 cm bis 58,18 cm")
+        print("Zulässiger Radius: 9,54 cm bis 56,15 cm")
         # Wert für x so definieren, dass die nächste Schleife ausgeführt wird
         x_value = 70
 
-        while x_value < -58.18 or x_value > 58.18:
-            print("Zulässige x Werte: -58,18 cm bis 58,18 cm")
+        while x_value < -56.14 or x_value > 56.14:
+            print("Zulässige x Werte: -56,15 cm bis 56,15 cm")
             try:
                 x_value = eval(input("x Wert: "))
             except SyntaxError:
@@ -141,9 +141,12 @@ class Input:
         y_range = y_object.calc_y_range()
         y_min = y_range.get("y_min")
         y_max = y_range.get("y_max")
+
+        # Spielraum der y-Koordinate gewährleisten
         if y_min != 0:
             y_min = y_min + 0.1
             y_max = y_max - 0.1
+
         # Wert für y so definieren, dass die nächste Schleife ausgeführt wird
         y_value = y_min - 1
 
@@ -200,7 +203,7 @@ class Test:
         for x in numpy.arange(x_start, x_end, i):
             progress = progress + 100 / total
             print("Fortschritt: ", int(progress), "%")
-            if -58.18 < x < 58.18:
+            if -56.14 < x < 56.14:
                 for y in numpy.arange(y_start, y_end, i):
                     y_object = JointValue(x, 0, 0)
                     y_range = y_object.calc_y_range()
