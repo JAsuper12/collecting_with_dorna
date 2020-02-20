@@ -582,7 +582,7 @@ class Camera:
 
     def get_ball_position_with_matrix(self):
         rmatrix = cv2.Rodrigues(self.rvecs)[0]
-        if len(self.ball_position) > 0:
+        for ball in self.ball_position:
             u, v = self.ball_position[0]
             uv_1 = np.array([[u, v, 1]], dtype=np.float32)
             uv_1 = uv_1.T
@@ -594,7 +594,7 @@ class Camera:
             s = (0 + Rt[2]) / RMuv[2]
             a = s*inverse_cam_mtx.dot(uv_1) - self.tvecs
             XYZ = inverse_R_mtx.dot(a)
-            print(XYZ)
+            print("Ballkoordinate: ", XYZ[0], XYZ[1])
 
 
 if __name__ == "__main__":
