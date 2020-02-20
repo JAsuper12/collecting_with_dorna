@@ -46,6 +46,10 @@ class Camera:
         self.world_localization_qr_codes = []
         self.results = 0
 
+        self.blue = Color(self.blue_boundaries, "blue")
+        self.red = Color(self.red_boundaries, "red",)
+        self.green = Color(self.green_boundaries, "green")
+
     def show_image(self):
         nRet = ueye.is_InitCamera(self.h_cam, None)
         nRet = ueye.is_SetDisplayMode(self.h_cam, ueye.IS_SET_DM_DIB)
@@ -73,11 +77,10 @@ class Camera:
             dst = cv2.undistort(frame, self.camera_matrix, self.dist_coeff, None, self.new_camera_matrix)
             x, y, w, h = roi
             self.dst = dst[y:y + h, x:x + w]
-
-            self.blue = Color(self.blue_boundaries, "blue", self.dst, self.found_blue_container)
-            self.red = Color(self.red_boundaries, "red", self.dst, self.found_red_container)
-            self.green = Color(self.green_boundaries, "green", self.dst, self.found_green_container)
-            self.extrinsic_calibration()
+            self.blue.create_color_mask(self.dst, self.found_blue_container)
+            self.red.create_color_mask(self.dst, self.found_red_container)
+            self.green.create_color_mask(self.dst, self.found_green_container)
+            #self.extrinsic_calibration()
             cv2.imshow("camera", self.dst)
 
             # Kamera schließen
@@ -176,9 +179,9 @@ class Camera:
                 elif i == 2:
                     self.dst = cv2.line(self.dst, p1, p2, (0, 0, 255), 5)
                 i = i + 1
-            self.blue.get_ball_position_with_grid(self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-            self.red.get_ball_position_with_grid(self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-            self.green.get_ball_position_with_grid(self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+            self.found_blue_container = self.blue.get_ball_position_with_grid(self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+            self.found_red_container = self.red.get_ball_position_with_grid(self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+            self.found_green_container = self.green.get_ball_position_with_grid(self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
 
     def qr_decoder(self, data, centre):
         if data == "(70, 10, 0)":
@@ -284,20 +287,18 @@ class Camera:
 
 
 class Color:
-    def __init__(self, boundaries, color, image, found_container):
+    def __init__(self, boundaries, color):
         self.boundaries = boundaries
         self.color = color
         self.container_world_position = []
         self.ball_position = []
         self.container_position = []
         self.contours_rectangle = []
-        self.dst = image
         self.increment = 0.25
+
+    def create_color_mask(self, dst, found_container):
+        self.dst = dst
         self.found_container = found_container
-
-        self.create_color_mask()
-
-    def create_color_mask(self):
         # create NumPy arrays from the boundaries
         hsv = cv2.cvtColor(self.dst, cv2.COLOR_BGR2HSV)
         bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
@@ -318,6 +319,7 @@ class Color:
         if not self.found_container:
             self.contours_rectangle.clear()
             self.container_world_position.clear()
+            self.container_position.clear()
 
         # check area
         for con in contours:
@@ -406,7 +408,6 @@ class Color:
                 for distance in range(3):
                     cm_per_pixel.append(
                         world_distance_origin_to_qr_code[distance] / image_distance_origin_to_qr_code[distance])
-                # print(cm_per_pixel)
 
                 equations = []
 
@@ -484,7 +485,7 @@ class Color:
                                 break
                             if -5 < difference < 5:
                                 place_of_similar_y_coordinates.append(n)
-                                # print(place_of_similar_y_coordinates)
+
                             if len(place_of_similar_y_coordinates) < 6:
                                 if n < len(x_y_coordinates) - 1:
                                     n = n + 1
@@ -499,8 +500,6 @@ class Color:
                                 for y in place_of_similar_y_coordinates:
                                     similar_y_coordinates.append(x_y_coordinates[y])
                                 found_similar_y_coordinates = True
-
-                            # print(similar_y_coordinates)
 
                         if found_similar_y_coordinates:
                             n = 1
@@ -635,6 +634,7 @@ class Color:
         elif self.color == "green":
             print("Positionen der grünen Bälle: ", ball_world_positions, "\nPosition des grünen Behälters: ",
                   self.container_world_position)
+        return self.found_container
 
     def get_ball_position_with_matrix(self, rvecs, tvecs, camera_matrix):
         rmatrix = cv2.Rodrigues(rvecs)[0]
