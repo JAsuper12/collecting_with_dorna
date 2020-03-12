@@ -29,7 +29,9 @@ class Camera:
         self.dist_coeff = None
         self.mean_error = 0
 
-        self.max_images = 60
+        self.path = input("Pfad zum Speichern der Bilder angeben: ")
+        if self.path == "default":
+            self.path = "C:/dorna/camera/images/"
 
     def show_image(self):
         nRet = ueye.is_InitCamera(self.h_cam, None)
@@ -62,11 +64,9 @@ class Camera:
             elif cv2.waitKey(1) & 0xFF == ord('t'):
                 ret, corners = cv2.findChessboardCorners(frame, (self.nx, self.ny), None)
                 if ret:
-                    im_name = "/home/lennart/dorna/camera/images/image" + str(self.n_im) + ".bmp"
+                    im_name = self.path + str(self.n_im) + ".bmp"
                     cv2.imwrite(im_name, frame)
                     self.n_im = self.n_im + 1
-                    if self.n_im == self.max_images:
-                        self.n_im = 0
                     print("Bild", self.n_im, "aufgenommen.")
                 else:
                     print("Kein Chessboard gefunden")
@@ -97,7 +97,7 @@ class Camera:
 
         for x in range(n_img):
             print("Bild Nummer", x, "wird erstellt")
-            images.append("/home/lennart/dorna/camera/images/image" + str(x) + ".bmp")
+            images.append(self.path + str(x) + ".bmp")
         x = 0
         for fname in images:
             img = cv2.imread(fname)
@@ -112,7 +112,7 @@ class Camera:
 
                 if save:
                     img = cv2.drawChessboardCorners(img, (self.nx, self.ny), corners2, ret)
-                    cb_img = "/home/lennart/dorna/camera/images/chessboard_corners/image" + str(x) + ".bmp"
+                    cb_img = self.path + str(x) + ".bmp"
                     cv2.imwrite(cb_img, img)
                     print("Bild gespeichert")
                     x = x + 1
@@ -120,7 +120,10 @@ class Camera:
         print("Schachbrettlinien erstellt.")
 
     def calibrate(self):
-        self.draw_chessboard_corners(49, False)
+        self.path_config = input("Pfad zum Speichern der Konfig-Datei: ")
+        if self.path_config == "default":
+            self.path_config = "C:/dorna/camera/"
+        self.draw_chessboard_corners(75, False)
 
         # kalibrieren
         print("Kamera wird kalibriert.")
@@ -131,7 +134,7 @@ class Camera:
         print(self.dist_coeff)
 
         # Kameramatrix optimieren
-        img = cv2.imread("/home/lennart/dorna/camera/images/image0.bmp")
+        img = cv2.imread(self.path + "0.bmp")
         h, w = img.shape[:2]
         self.newcameramatrix, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
 
@@ -141,7 +144,7 @@ class Camera:
         # Bild zuschneiden
         x, y, w, h = roi
         dst = dst[y:y+h, x:x+w]
-        cv2.imwrite("/home/lennart/dorna/camera/images/calibrateresult.bmp", dst)
+        cv2.imwrite(self.path + "calibrated_result.bmp", dst)
         print("Kamera kalibriert.")
 
         # Ergebnis überprüfen, sollte möglichst 0 sein
@@ -160,7 +163,7 @@ class Camera:
             "dist_coeff": self.dist_coeff.tolist(),
             "mean_error": self.mean_error
         }
-        with open("/home/lennart/dorna/camera/camera_calibration_config.json", "w") as file:
+        with open(self.path_config + "camera_calibration_config.json", "w") as file:
             json.dump(data, file)
 
 
