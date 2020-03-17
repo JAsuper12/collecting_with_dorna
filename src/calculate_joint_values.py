@@ -5,7 +5,7 @@ import numpy
 
 class JointValue:
     def __init__(self, x, y, z):
-        # Länge von Link 1, Link 2 und Link 3 im greifenden Zustand
+        # Länge von Element 1, Element 2 und Element 3 im greifenden Zustand
         self.l1 = 20.32
         self.l2 = 15.24
         self.l3 = 17
@@ -20,15 +20,15 @@ class JointValue:
 
         self.r = polar_coordinates.get("r")
 
-        # s ist als der Abstand der Drehpunkte von Joint J1 und Joint J3 definiert
+        # s ist als der Abstand der Drehpunkte von Gelenk J1 und Gelenk J3 definiert
         self.s = math.sqrt(math.pow(self.r - 9.55 - 1, 2) + math.pow(self.h, 2))
 
-    # berechnet welche Werte die Joints annehmen müssen, um die vorgegebene Zielkoordinate zu erreichen
+    # berechnet welche Werte die Gelenke annehmen müssen, um die vorgegebene Zielkoordinate zu erreichen
     def calc_joint_values(self):
         polar_coordinates = self.coordinates.calc()
         psi = polar_coordinates.get("psi")
 
-        # Bereich 1
+        # Berechnung für Bereich 1
         if self.r < 26.27:
             l = 26.27 - self.r
             _z = math.sqrt(math.pow(self.l3, 2) - math.pow(l, 2))
@@ -41,7 +41,7 @@ class JointValue:
             j2 = -math.pi + self.beta
             j3 = -(math.pi / 2) - gamma - j1 - j2
 
-        # Bereich 2
+        # Berechnung für Bereich 2
         elif 26.27 <= self.r <= 41.45:
             _z = self.l3
             alpha_ = math.asin(self.h / self.s)
@@ -50,7 +50,7 @@ class JointValue:
             j2 = -math.pi + self.beta
             j3 = -(math.pi / 2) - j1 - j2
 
-        # Bereich 3
+        # Berechnung für Bereich 3
         elif self.r > 41.45:
             self.l3 = 15
             l = self.r - 41.45
@@ -75,7 +75,7 @@ class JointValue:
 
         return {"j0": psi + 90, "j1": j1_degrees, "j2": j2_degrees, "j3": j3_degrees, "_z": _z}
 
-    # Berechnet die Winkel alpha und beta mit Hilfe des allgemeinen Kosinussatzes
+    # Berechnet die Winkel alpha und beta mithilfe des allgemeinen Kosinussatzes
     def calc_angles(self):
         self.alpha = math.acos((math.pow(self.s, 2) - math.pow(self.l2, 2) + math.pow(self.l1, 2)) / (2 * self.l1 * self.s))
         self.beta = math.acos((-math.pow(self.s, 2) + math.pow(self.l2, 2) + math.pow(self.l1, 2)) / (2 * self.l1 * self.l2))
@@ -117,17 +117,20 @@ class JointValue:
         elif self.r > 41.45:
             z_max = 34.2 - _z
 
+        # z_min liegt stets auf der Höhe der Arbeitsfläche
         z_min = 0
 
         return {"z_min": z_min, "z_max": z_max}
 
 
+# Lässt den Benutzer Koordinaten eingeben
 class Input:
     def input_values(self):
         print("Zulässiger Radius: 9,54 cm bis 56,15 cm")
         # Wert für x so definieren, dass die nächste Schleife ausgeführt wird
         x_value = 70
 
+        # Eingabe der x-Koordinate
         while x_value < -56.14 or x_value > 56.14:
             print("Zulässige x Werte: -56,15 cm bis 56,15 cm")
             try:
@@ -150,6 +153,7 @@ class Input:
         # Wert für y so definieren, dass die nächste Schleife ausgeführt wird
         y_value = y_min - 1
 
+        # Eingabe der y-Koordinate
         while y_value < y_min or y_value > y_max:
             print("Zulässige y Werte:", y_min, "cm bis", y_max, "cm")
             try:
@@ -168,6 +172,7 @@ class Input:
         # Wert für z so definieren, dass die nächste Schleife ausgeführt wird
         z_value = z_min - 1
 
+        # Eingabe der z-Koordinate
         while z_value < z_min or z_value > z_max:
             print("Zulässige z Werte:", z_min, "cm bis", z_max, "cm")
             try:
@@ -180,8 +185,10 @@ class Input:
         return {"x": x_value, "y": y_value, "z": z_value}
 
 
+# Dient zum Testen des definierten zulässigen Bereiches
 class Test:
     def __init__(self,):
+        # Eingabe des Bereiches der getestet werden soll und mit welchem Inkrement
         print("Zu überprüfender x-Bereich:")
         x_start = eval(input("Start x: "))
         x_end = eval(input("Ende x: "))
@@ -201,6 +208,7 @@ class Test:
         errors = []
 
         for x in numpy.arange(x_start, x_end, i):
+            # Ausgabe des Fortschritts in Prozent
             progress = progress + 100 / total
             print("Fortschritt: ", int(progress), "%")
             if -56.14 < x < 56.14:
@@ -228,9 +236,10 @@ class Test:
                                 try:
                                     joint_value.calc_joint_values()
 
+                                # Wenn bei der Berechnung einer Koordinate ein Fehler festgestellt wurde, soll die 
+                                # Koordinate gespeichert werden
                                 except ValueError:
                                     errors.append([x, y, z])
-
                             else:
                                 continue
                     else:
@@ -238,6 +247,7 @@ class Test:
             else:
                 continue
 
+        # Ausgabe der fehlerhaften Koordinaten, falls welche gefunden wurden
         number_errors = len(errors)
         if number_errors == 0:
             print("Keine Fehler gefunden.")
