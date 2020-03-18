@@ -6,6 +6,7 @@ import json
 
 class Camera:
     def __init__(self):
+        # Variabeln für Kameraverarbeitung
         self.h_cam = ueye.HIDS(0)
         self.pitch = ueye.INT()
         self.ColorMode = ueye.IS_CM_BGRA8_PACKED
@@ -29,18 +30,18 @@ class Camera:
         self.dist_coeff = None
         self.mean_error = 0
 
+        # Pfad zum Speichern der Bilder angeben
         self.path = input("Pfad zum Speichern der Bilder angeben: ")
         if self.path == "default":
             self.path = "C:/dorna/camera/images/"
 
     def show_image(self):
+        # Kamera initialisieren
         nRet = ueye.is_InitCamera(self.h_cam, None)
         nRet = ueye.is_SetDisplayMode(self.h_cam, ueye.IS_SET_DM_DIB)
         nRet = ueye.is_AOI(self.h_cam, ueye.IS_AOI_IMAGE_GET_AOI, self.rectAOI, ueye.sizeof(self.rectAOI))
-
         self.width = self.rectAOI.s32Width
         self.height = self.rectAOI.s32Height
-
         nRet = ueye.is_AllocImageMem(self.h_cam, self.width, self.height, self.nBitsPerPixel, self.pcImageMemory,
                                      self.MemID)
         nRet = ueye.is_SetImageMem(self.h_cam, self.pcImageMemory, self.MemID)
@@ -50,17 +51,18 @@ class Camera:
                                        self.nBitsPerPixel, self.pitch)
 
         while nRet == ueye.IS_SUCCESS:
+            # Daten der Kamera auslesen
             array = ueye.get_data(self.pcImageMemory, self.width, self.height, self.nBitsPerPixel, self.pitch,
                                   copy=True)
+            # Bild zuschneiden
             frame = np.reshape(array, (self.height.value, self.width.value, self.bytes_per_pixel))
             frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
+            # Kamerabild ausgeben
             cv2.imshow("camera", frame)
-
-            # Kamera schließen
+            # mit q Kamera schließen
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
-            # Bild aufnehmen und speichern, wenn ein chessboard erkannt wird
+            # mit t Bild aufnehmen und speichern, wenn ein Schachbrettmuster erkannt wird
             elif cv2.waitKey(1) & 0xFF == ord('t'):
                 ret, corners = cv2.findChessboardCorners(frame, (self.nx, self.ny), None)
                 if ret:
@@ -71,12 +73,12 @@ class Camera:
                 else:
                     print("Kein Chessboard gefunden")
 
-            # chessboardlinien zeichnen und speichern
+            # mit d Schachbrettlinien zeichnen und speichern
             elif cv2.waitKey(1) & 0xFF == ord('d'):
                 n_img = eval(input("Wie viele Bilder sollen bearbeitet werden? "))
                 self.draw_chessboard_corners(n_img, True)
 
-            # Kamera kalibrieren
+            # mit c Kamera intrinsisch kalibrieren
             elif cv2.waitKey(1) & 0xFF == ord('c'):
                 self.calibrate()
 
@@ -87,9 +89,9 @@ class Camera:
     def draw_chessboard_corners(self, n_img, save):
         print("Schabrettlinien werden erstellt.")
         criteria = (cv2.TermCriteria_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+        # Weltkoordinaten der Referenzpunkte des Schachbrettmusters speichern
         objectp = np.zeros((self.ny * self.nx, 3), np.float32)
         objectp[:, :2] = (self.size_of_square * np.mgrid[0:8, 0:6]).T.reshape(-1, 2)
-
 
         self.objectpoints = []
         self.imagepoints = []
@@ -100,32 +102,33 @@ class Camera:
             images.append(self.path + str(x) + ".bmp")
         x = 0
         for fname in images:
+            # aktuelles Bild speichern
             img = cv2.imread(fname)
             self.gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
+            # Schachbrettmuster im Bild suchen
             ret, corners = cv2.findChessboardCorners(self.gray, (self.nx, self.ny), None)
             if ret:
                 self.objectpoints.append(objectp)
-
                 corners2 = cv2.cornerSubPix(self.gray, corners, (11, 11), (-1, -1), criteria)
+                # Bildkoordinaten der Referenzpunkte des Schachbrettmusters speichern
                 self.imagepoints.append(corners2)
-
+                # Bild mit eingezeichneten Schachbrettmuster speichern
                 if save:
                     img = cv2.drawChessboardCorners(img, (self.nx, self.ny), corners2, ret)
                     cb_img = self.path + str(x) + ".bmp"
                     cv2.imwrite(cb_img, img)
                     print("Bild gespeichert")
                     x = x + 1
-
         print("Schachbrettlinien erstellt.")
 
     def calibrate(self):
+        # Pfad zum Speichern der Kameramatrix und Verzerrungskoeffizienten angeben
         self.path_config = input("Pfad zum Speichern der Konfig-Datei: ")
         if self.path_config == "default":
             self.path_config = "C:/dorna/camera/"
         self.draw_chessboard_corners(75, False)
 
-        # kalibrieren
+        # Kamera intrinsisch kalibrieren
         print("Kamera wird kalibriert.")
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(self.objectpoints, self.imagepoints, self.gray.shape[::-1], None, None)
         self.camera_matrix = mtx
@@ -138,7 +141,7 @@ class Camera:
         h, w = img.shape[:2]
         self.newcameramatrix, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
 
-        # Bild unverzerren
+        # Bild entverzerren
         dst = cv2.undistort(img, mtx, dist, None, self.newcameramatrix)
 
         # Bild zuschneiden
@@ -154,7 +157,7 @@ class Camera:
             self.mean_error = self.mean_error + error
 
         print("Fehlerquote: ", self.mean_error / len(self.objectpoints))
-
+        # Kameramatrix und Verzerrungskoeffizienten speichern
         self.save_calibration_config()
 
     def save_calibration_config(self):
