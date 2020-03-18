@@ -42,18 +42,18 @@ class Camera:
         nRet = ueye.is_AOI(self.h_cam, ueye.IS_AOI_IMAGE_GET_AOI, self.rectAOI, ueye.sizeof(self.rectAOI))
         self.width = self.rectAOI.s32Width
         self.height = self.rectAOI.s32Height
-        nRet = ueye.is_AllocImageMem(self.h_cam, self.width, self.height, self.nBitsPerPixel, self.pcImageMemory,
-                                     self.MemID)
+        nRet = ueye.is_AllocImageMem(self.h_cam, self.width, self.height,
+                                     self.nBitsPerPixel, self.pcImageMemory, self.MemID)
         nRet = ueye.is_SetImageMem(self.h_cam, self.pcImageMemory, self.MemID)
         nRet = ueye.is_SetColorMode(self.h_cam, self.ColorMode)
         nRet = ueye.is_CaptureVideo(self.h_cam, ueye.IS_DONT_WAIT)
-        nRet = ueye.is_InquireImageMem(self.h_cam, self.pcImageMemory, self.MemID, self.width, self.height,
-                                       self.nBitsPerPixel, self.pitch)
+        nRet = ueye.is_InquireImageMem(self.h_cam, self.pcImageMemory, self.MemID, self.width,
+                                       self.height, self.nBitsPerPixel, self.pitch)
 
         while nRet == ueye.IS_SUCCESS:
             # Daten der Kamera auslesen
-            array = ueye.get_data(self.pcImageMemory, self.width, self.height, self.nBitsPerPixel, self.pitch,
-                                  copy=True)
+            array = ueye.get_data(self.pcImageMemory, self.width, self.height,
+                                  self.nBitsPerPixel, self.pitch, copy=True)
             # Bild zuschneiden
             frame = np.reshape(array, (self.height.value, self.width.value, self.bytes_per_pixel))
             frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
@@ -130,7 +130,8 @@ class Camera:
 
         # Kamera intrinsisch kalibrieren
         print("Kamera wird kalibriert.")
-        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(self.objectpoints, self.imagepoints, self.gray.shape[::-1], None, None)
+        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(self.objectpoints, self.imagepoints,
+                                                           self.gray.shape[::-1], None, None)
         self.camera_matrix = mtx
         self.dist_coeff = dist
         print(self.camera_matrix)
