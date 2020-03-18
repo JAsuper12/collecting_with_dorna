@@ -22,7 +22,7 @@ class Camera:
         self.height = None
         self.dst = None
 
-        # laden der kalibrierten Matrix
+        # laden der intrinsischen Kalibriermatrix
         self.load_calibration_config()
 
         # Variabeln zur Farberkennung
@@ -50,6 +50,7 @@ class Camera:
         self.results = 0
 
     def show_image(self):
+        # Kamera initialisieren
         nRet = ueye.is_InitCamera(self.h_cam, None)
         nRet = ueye.is_SetDisplayMode(self.h_cam, ueye.IS_SET_DM_DIB)
         nRet = ueye.is_AOI(self.h_cam, ueye.IS_AOI_IMAGE_GET_AOI, self.rectAOI, ueye.sizeof(self.rectAOI))
@@ -67,34 +68,45 @@ class Camera:
 
 
         while nRet == ueye.IS_SUCCESS:
+            # Daten der Kamera auslesen
             array = ueye.get_data(self.pcImageMemory, self.width, self.height, self.nBitsPerPixel, self.pitch, copy=False)
+            # Bild zuschneiden
             frame = np.reshape(array, (self.height.value, self.width.value, self.bytes_per_pixel))
             frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
             size = (self.height, self.width)
+            # optimale Kameramatrix erstellen
             self.new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(self.camera_matrix, self.dist_coeff, size, 1, size)
+            # Bild entzerren
             dst = cv2.undistort(frame, self.camera_matrix, self.dist_coeff, None, self.new_camera_matrix)
             x, y, w, h = roi
             self.dst = dst[y:y + h, x:x + w]
 
+            # Farberkennung durchführen
             self.detect_colors()
 
+            # Kamera extrinsisch kalibrieren
             self.extrinsic_calibration()
 
+            # Bild der Kamera auf dem Bildschirm ausgeben
             cv2.imshow("camera", self.dst)
+            # Bild mit nur blauen Pixeln ausgeben
             cv2.imshow("blue_only", self.show_blue_color)
 
-            # Kamera schließen
+            # mit q Kamera schließen
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
+            # mit t derzeitiges Bild aufnehemen
             elif cv2.waitKey(100) & 0xFF == ord('t'):
                 cv2.imwrite("C:\dorna\camera\images\image.bmp", self.dst)
                 cv2.imwrite("C:\dorna\camera\images\mask.bmp", self.show_blue_color)
 
+            # mit l Behälterposition zurücksetzen
             elif cv2.waitKey(100) & 0xFF == ord('l'):
                 self.found_container = False
                 self.container_world_position.clear()
 
+        # Kamera freigeben
         ueye.is_FreeImageMem(self.h_cam, self.pcImageMemory, self.MemID)
         ueye.is_ExitCamera(self.h_cam)
         cv2.destroyAllWindows()
@@ -107,16 +119,15 @@ class Camera:
             self.mean_error = data["mean_error"]
 
     def detect_colors(self):
-        # create NumPy arrays from the boundaries
         hsv = cv2.cvtColor(self.dst, cv2.COLOR_BGR2HSV)
         bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
         for (lower, upper) in self.boundaries:
             lower = np.array(lower)
             upper = np.array(upper)
-
+            # Maske erstellen aus den definierten Farbbereich
             self.mask = cv2.inRange(bgr, lower, upper)
-
+            # Bild mit nur blauen Pixeln erstellen
             self.show_blue_color = cv2.bitwise_and(bgr, bgr, mask=self.mask)
         self.draw_contours()
 
@@ -129,13 +140,13 @@ class Camera:
         if not self.found_container:
             self.contours_rectangle.clear()
 
-        # check area
+        # Bereiche auf Größe überprüfen
         for con in contours:
             area = cv2.contourArea(con)
             if 200 < area < 10000:
                 contours_area.append(con)
 
-        # check if contour is of circular shape
+        # Form der Bereiches ermitteln
         for con in contours_area:
             perimeter = cv2.arcLength(con, True)
             area = cv2.contourArea(con)
@@ -144,27 +155,33 @@ class Camera:
             circularity = 4 * m.pi * (area / (perimeter ** 2))
 
             if len(approx) == 4 and not self.found_container:
-                # compute the bounding box of the contour
+                # Bereich wurde als Rechteck erkannt und wird als Behälter identifiziert
                 self.contours_rectangle.append(con)
 
             elif 0.8 < circularity:
+                # Bereich wurde als Kreis erkannt und wird als Ball identifiziert
                 contours_circles.append(con)
 
         for cnt in contours_circles:
+            # Mittelpunkte der Bälle berechnen und Bildposition speichern
             M = cv2.moments(cnt)
             self.cX = int(M["m10"] / M["m00"])
             self.cY = int(M["m01"] / M["m00"]) + 5
             self.ball_position.append((self.cX, self.cY))
-
+            # Kontur des Balles einzeichnen
             cv2.drawContours(self.dst, [cnt], 0, (0, 255, 0), 1)
+            # Mittelpunkt einzeichnen
             cv2.circle(self.dst, (self.cX, self.cY), 2, (0, 255, 0), -1)
 
         for cnt in self.contours_rectangle:
+            # Mittelpunkt des Behälters berechnen und Bildposition speichern
             M = cv2.moments(cnt)
             self.cX_container = int(M["m10"] / M["m00"])
             self.cY_container = int(M["m01"] / M["m00"])
             self.container_position.append((self.cX_container, self.cY_container))
+            # Kontur des Behälters einzeichnen
             cv2.drawContours(self.dst, [cnt], 0, (0, 128, 255), 1)
+            # Mittelpunkt einzeichnen
             cv2.circle(self.dst, (self.cX_container, self.cY_container), 1, (0, 128, 255), -1)
 
     def extrinsic_calibration(self):
@@ -173,26 +190,22 @@ class Camera:
         self.localization_qr_codes.clear()
         self.world_localization_qr_codes.clear()
         self.qr_codes = pyzbar.decode(self.dst)
-        # loop over the detected barcodes
-
+        # alle erkannten QR-Codes durchgehen
         for qr in self.qr_codes:
-            # extract the bounding box location of the barcode and draw
-            # the bounding box surrounding the barcode on the image
+            # Position des Codes ermitteln
             (x, y, w, h) = qr.rect
-
+            # Mittelpunkt des Codes berechnen und als Bildkoordinate speichern
             centre = (x + int((w / 2)), y + int((h / 2)))
             self.qr_centres.append(centre)
-
+            # erkannten Code umrahmen
             cv2.rectangle(self.dst, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            # Mittelpunkt einzeichnen
             cv2.circle(self.dst, centre, 2, (0, 255, 0), -1)
-
-            # the barcode data is a bytes world so if we want to draw it
-            # on our output image we need to convert it to a string first
+            # Daten aus dem Codes als String speichern
             data = qr.data.decode("utf-8")
-
+            # Weltkoordinate des Codes speichern
             self.qr_decoder(data, centre)
-
-            # draw the barcode data and barcode type on the image
+            # Daten über den Codes einzeichnen
             text = "{}".format(data)
             cv2.putText(self.dst, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
@@ -211,18 +224,18 @@ class Camera:
         else:
             valid_qr_spread = False
 
+        # wenn genügend Codes erkannt wurden und diese gut verteilt sind, soll die Kamera extrinsisch kalibriert werden
         if len(self.qr_centres) >= 6 and valid_qr_spread:
             self.image_points_of_qr_codes = np.array(self.qr_centres, dtype="float")
-
+            # Kamera extrinsisch Kalibrieren
             _, self.rvecs, self.tvecs = cv2.solvePnP(world_points, self.image_points_of_qr_codes, self.camera_matrix, self.dist_coeff)
-
+            # Bildkoordinaten der Koordinatenachsen berechnen
             self.origin, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             z_axis, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 55.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             x_axis, jacobian = cv2.projectPoints(np.array([(55.0, 0.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             y_axis, jacobian = cv2.projectPoints(np.array([(0.0, 55.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
             axis = [x_axis, y_axis, z_axis]
-
-
+            # Koordinatenachsen einzeichnen
             i = 0
             for x in axis:
                 p1 = (int(self.origin[0][0][0]), int(self.origin[0][0][1]))
@@ -234,7 +247,8 @@ class Camera:
                 elif i == 2:
                     self.dst = cv2.line(self.dst, p1, p2, (0, 0, 255), 5)
                 i = i + 1
-            self.get_ball_position_with_matrix()
+            # Positionsbestimmung der Bälle mit Vergleichsansatz
+            self.get_ball_position_compare()
 
     def qr_decoder(self, data, centre):
         if data == "(70, 10, 0)":
@@ -328,15 +342,19 @@ class Camera:
                 self.localization_qr_codes.append(centre)
                 self.world_localization_qr_codes.append([-55, -10, 0])
 
+    # GPS-Ansatz
     def get_ball_position_with_circles(self):
+        # wenn mindestens drei QR-Codes erkannt wurden
         if len(self.localization_qr_codes) == 3:
             distance_balls_to_qr_code = []
 
-            # print(len(self.ball_position))
             i = 0
+            # für jeden Ball der erkannt wurde die Schleife durchlaufen
             for (ball_x, ball_y) in self.ball_position:
                 distance = []
                 n_distance = 0
+                # Abstand von den drei Codes zum Ball bestimmen und als Kreise einzeichnen
+                # für jeden Ball eine andere Farbe verwenden zur Übersichtlichkeit
                 for (qr_x, qr_y) in self.localization_qr_codes:
                     distance.append(m.sqrt(m.pow((ball_x - qr_x), 2) + m.pow((ball_y - qr_y), 2)))
                     if i == 0:
@@ -349,23 +367,28 @@ class Camera:
                 distance_balls_to_qr_code.append(distance)
                 i = i + 1
 
+            # wenn mindestens ein Ball erkannt wurde
             if len(self.ball_position) > 0:
                 math_error = False
                 world_distance_origin_to_qr_code = []
+                # Abstand der QR-Codes zum Koordinatenursprung ermitteln
                 for [x, y, z] in self.world_localization_qr_codes:
                     world_distance_origin_to_qr_code.append(m.sqrt(x ** 2 + y ** 2))
 
                 image_distance_origin_to_qr_code = []
+                # und den dazugehörigen Bildkoordinatenabstand
                 for [u, v] in self.localization_qr_codes:
-                    image_distance_origin_to_qr_code.append(m.sqrt((u - self.origin[0][0][0]) ** 2 + (v - self.origin[0][0][1]) ** 2))
+                    image_distance_origin_to_qr_code.append(m.sqrt((u - self.origin[0][0][0]) ** 2 +
+                                                                   (v - self.origin[0][0][1]) ** 2))
 
                 cm_per_pixel = []
+                # durchschnittliche cm pro Pixel im Bild bestimmen
                 for distance in range(3):
-                    cm_per_pixel.append(world_distance_origin_to_qr_code[distance] / image_distance_origin_to_qr_code[distance])
-                # print(cm_per_pixel)
+                    cm_per_pixel.append(world_distance_origin_to_qr_code[distance]
+                                        / image_distance_origin_to_qr_code[distance])
 
                 equations = []
-
+                # x, y und r der drei Gleichungssysteme bestimmen
                 for j in range(len(self.world_localization_qr_codes)):
                     x = self.world_localization_qr_codes[j][0]
                     y = self.world_localization_qr_codes[j][1]
@@ -373,6 +396,7 @@ class Camera:
                     equations.append([x, y, r])
 
                 x_y_coordinates = []
+                # die drei Gleichungssysteme lösen
                 for i in range(3):
                     x_coordinates = []
                     y_coordinates = []
@@ -400,24 +424,25 @@ class Camera:
 
                     p = e / d
                     q = f / d
-
+                    # y-Koordinaten berechnen
                     try:
                         y_coordinates.append(-p / 2 + m.sqrt((p / 2) ** 2 - q))
                         y_coordinates.append(-p / 2 - m.sqrt((p / 2) ** 2 - q))
                     except ValueError:
                         math_error = True
                         break
-
+                    # dazugehörigen x-Koordinaten berechnen
                     for y in y_coordinates:
                         x_coordinates.append(m.sqrt(r_1 ** 2 - y ** 2 + 2 * b_1 * y - b_1 ** 2) + a_1)
                         x_coordinates.append(-m.sqrt(r_1 ** 2 - y ** 2 + 2 * b_1 * y - b_1 ** 2) + a_1)
-
+                    # x- und y-Koordinaten zusammenfügen
                     for j in range(4):
                         if j < 2:
                             x_y_coordinates.append([x_coordinates[j], y_coordinates[0]])
                         else:
                             x_y_coordinates.append([x_coordinates[j], y_coordinates[1]])
 
+                # Koordinaten miteinander vergleichen und die drei Koordinaten ermitteln, welche nahe beieinander liegen
                 if not math_error:
                     index_error = False
                     coordinates_found = False
@@ -440,7 +465,7 @@ class Camera:
                                 break
                             if -5 < difference < 5:
                                 place_of_similar_y_coordinates.append(n)
-                                # print(place_of_similar_y_coordinates)
+
                             if len(place_of_similar_y_coordinates) < 6:
                                 if n < len(x_y_coordinates) - 1:
                                     n = n + 1
@@ -455,8 +480,6 @@ class Camera:
                                 for y in place_of_similar_y_coordinates:
                                     similar_y_coordinates.append(x_y_coordinates[y])
                                 found_similar_y_coordinates = True
-
-                            # print(similar_y_coordinates)
 
                         if found_similar_y_coordinates:
                             n = 1
@@ -483,6 +506,7 @@ class Camera:
                                     found_similar_x_coordinates = True
                                     coordinates_found = True
 
+                    # Schwerpunkt der drei Koordinaten berechnen
                     if not index_error:
                         sum_x_coordinates = 0
                         sum_y_coordinates = 0
@@ -494,24 +518,29 @@ class Camera:
                         average_y_coordinate = sum_y_coordinates / 3
 
                         ball_coordinate = [average_x_coordinate, average_y_coordinate]
-
+                        # Ballkoordinate ausgeben
                         print(ball_coordinate)
 
-    def get_ball_position_with_grid(self):
+    # Vergleichsansatz
+    def get_ball_position_compare(self):
         ball_world_positions = []
-
+        # für jeden gefundenen Ball Schleife einmal durchlaufen
         for ball in self.ball_position:
             y_coordinate_of_smallest_difference = []
             x_b, y_b = ball
             x = -60
             x_difference = []
+            # jede x-Koordinate des Koordinatensystems durchgehen
             while x <= 60:
                 y = -10
                 y_difference = []
+                # jede y-Koordinate des Koordinatensystems einmal durchgehen und Bildkoordinaten berechnen
                 while y <= 60:
-                    image_coordinate, jacobian = cv2.projectPoints(np.array([(x, y, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+                    image_coordinate, jacobian = cv2.projectPoints(np.array([(x, y, 0.0)]), self.rvecs, self.tvecs,
+                                                                   self.camera_matrix, self.dist_coeff)
+                    # Abstand zwischen berechneten Bildkoordinate und Bildkoordinate des Balles berechnen
                     y_difference.append([y, y_b - image_coordinate[0][0][1]])
-
+                    # Abstände miteinander vergleichen und größeren Abstand löschen
                     if len(y_difference) == 2:
                         if 0 < y_difference[0][1] < y_difference[1][1] or y_difference[1][1] < y_difference[0][1] < 0:
                             y_difference.remove(y_difference[1])
@@ -522,9 +551,14 @@ class Camera:
                 x = x + self.increment
 
             for y in range(len(y_coordinate_of_smallest_difference)):
-                image_coordinate, jacobian = cv2.projectPoints(np.array([(y * self.increment - 60, y_coordinate_of_smallest_difference[y], 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-                x_difference.append([y * self.increment - 60, y_coordinate_of_smallest_difference[y], x_b - image_coordinate[0][0][0]])
-
+                # Bildkoordinate jeder x-Koordinate auf Höhe der y-Koordinate mit den kleinsten Abstand zum Ball
+                # berechnen
+                image_coordinate, jacobian = cv2.projectPoints(np.array([(y * self.increment - 60, y_coordinate_of_smallest_difference[y], 0.0)]),
+                                                               self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+                # Abstand zwischen berechneten Bildkoordinate und Bildkoordinate des Balles berechnen
+                x_difference.append([y * self.increment - 60, y_coordinate_of_smallest_difference[y],
+                                     x_b - image_coordinate[0][0][0]])
+                # Abstände miteinander vergleichen und größeren Abstand löschen
                 if len(x_difference) == 2:
                     if 0 < x_difference[0][2] < x_difference[1][2] or x_difference[1][2] < x_difference[0][2] < 0:
                         x_difference.remove(x_difference[1])
@@ -532,7 +566,7 @@ class Camera:
                         x_difference.remove(x_difference[0])
 
             ball_world_positions.append((x_difference[0][0], x_difference[0][1]))
-
+        # prognostizierte Koordinate einzeichnen
         for balls in ball_world_positions:
             image_coordinate, jacobian = cv2.projectPoints(
                 np.array([(x_difference[0][0], x_difference[0][1], 0.0)]), self.rvecs, self.tvecs,
@@ -540,6 +574,7 @@ class Camera:
             estimated_point = (int(image_coordinate[0][0][0]), int(image_coordinate[0][0][1]))
             cv2.circle(self.dst, estimated_point, 2, (0, 0, 255), -1)
 
+        # selber Ablauf mit dem Behälter
         if not self.found_container and len(self.container_position) > 0:
             y_coordinate_of_smallest_difference = []
             x_b, y_b = self.container_position[0]
@@ -577,11 +612,14 @@ class Camera:
 
             self.container_world_position.append((x_difference[0][0], x_difference[0][1]))
             self.found_container = True
-
+        # Koordinaten ausgeben
         print("Positionen der Bälle: ", ball_world_positions, "\nPosition des Behälters: ", self.container_world_position)
 
+    # Berechnen der Weltkoordinaten
     def get_ball_position_with_matrix(self):
+        # Rotationsmatrix berechnen
         rmatrix = cv2.Rodrigues(self.rvecs)[0]
+        # für jeden gefundenen Ball die Weltkoordinaten berechnen
         for ball in self.ball_position:
             u, v = self.ball_position[0]
             uv_1 = np.array([[u, v, 1]], dtype=np.float32)
@@ -594,6 +632,7 @@ class Camera:
             s = (0 + Rt[2]) / RMuv[2]
             a = s*inverse_cam_mtx.dot(uv_1) - self.tvecs
             XYZ = inverse_R_mtx.dot(a)
+            # Ballkoordinaten ausgeben
             print("Ballkoordinate: ", XYZ[0], XYZ[1])
 
 
