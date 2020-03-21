@@ -36,7 +36,7 @@ class Camera:
         self.cX_container = None
         self.cY_container = None
 
-        # Variablen zur Positionierung
+        # Variablen zur Positionsbestimmung
         self.container_world_position = []
         self.ball_position = []
         self.container_position = []
@@ -54,10 +54,8 @@ class Camera:
         nRet = ueye.is_InitCamera(self.h_cam, None)
         nRet = ueye.is_SetDisplayMode(self.h_cam, ueye.IS_SET_DM_DIB)
         nRet = ueye.is_AOI(self.h_cam, ueye.IS_AOI_IMAGE_GET_AOI, self.rectAOI, ueye.sizeof(self.rectAOI))
-
         self.width = self.rectAOI.s32Width
         self.height = self.rectAOI.s32Height
-
         nRet = ueye.is_AllocImageMem(self.h_cam, self.width, self.height, self.nBitsPerPixel, self.pcImageMemory,
                                      self.MemID)
         nRet = ueye.is_SetImageMem(self.h_cam, self.pcImageMemory, self.MemID)
@@ -65,7 +63,6 @@ class Camera:
         nRet = ueye.is_CaptureVideo(self.h_cam, ueye.IS_DONT_WAIT)
         nRet = ueye.is_InquireImageMem(self.h_cam, self.pcImageMemory, self.MemID, self.width, self.height,
                                        self.nBitsPerPixel, self.pitch)
-
 
         while nRet == ueye.IS_SUCCESS:
             # Daten der Kamera auslesen
@@ -125,7 +122,7 @@ class Camera:
         for (lower, upper) in self.boundaries:
             lower = np.array(lower)
             upper = np.array(upper)
-            # Maske erstellen aus den definierten Farbbereich
+            # Maske aus den definierten Farbbereich erstellen
             self.mask = cv2.inRange(bgr, lower, upper)
             # Bild mit nur blauen Pixeln erstellen
             self.show_blue_color = cv2.bitwise_and(bgr, bgr, mask=self.mask)
@@ -146,7 +143,7 @@ class Camera:
             if 200 < area < 10000:
                 contours_area.append(con)
 
-        # Form der Bereiches ermitteln
+        # Form des Bereiches ermitteln
         for con in contours_area:
             perimeter = cv2.arcLength(con, True)
             area = cv2.contourArea(con)
@@ -155,11 +152,11 @@ class Camera:
             circularity = 4 * m.pi * (area / (perimeter ** 2))
 
             if len(approx) == 4 and not self.found_container:
-                # Bereich wurde als Rechteck erkannt und wird als Behälter identifiziert
+                # Bereich wurde als Rechteck erkannt und wird daher als Behälter identifiziert
                 self.contours_rectangle.append(con)
 
             elif 0.8 < circularity:
-                # Bereich wurde als Kreis erkannt und wird als Ball identifiziert
+                # Bereich wurde als Kreis erkannt und wird daher als Ball identifiziert
                 contours_circles.append(con)
 
         for cnt in contours_circles:
@@ -205,7 +202,7 @@ class Camera:
             data = qr.data.decode("utf-8")
             # Weltkoordinate des Codes speichern
             self.qr_decoder(data, centre)
-            # Daten über den Codes einzeichnen
+            # Daten über den Code einzeichnen
             text = "{}".format(data)
             cv2.putText(self.dst, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
@@ -218,7 +215,6 @@ class Camera:
                 positive_qr_codes = positive_qr_codes + 1
             else:
                 negative_qr_codes = negative_qr_codes + 1
-
         if positive_qr_codes >= 3 and negative_qr_codes >= 3:
             valid_qr_spread = True
         else:
@@ -247,7 +243,7 @@ class Camera:
                 elif i == 2:
                     self.dst = cv2.line(self.dst, p1, p2, (0, 0, 255), 5)
                 i = i + 1
-            # Positionsbestimmung der Bälle mit Vergleichsansatz
+            # Positionsbestimmung der Bälle und Behälter mit Vergleichsansatz
             self.get_ball_position_compare()
 
     def qr_decoder(self, data, centre):
@@ -564,7 +560,7 @@ class Camera:
                         x_difference.remove(x_difference[1])
                     else:
                         x_difference.remove(x_difference[0])
-
+            # Weltkoordinate in dem sich ein Ball befindet
             ball_world_positions.append((x_difference[0][0], x_difference[0][1]))
         # prognostizierte Koordinate einzeichnen
         for balls in ball_world_positions:
@@ -574,7 +570,7 @@ class Camera:
             estimated_point = (int(image_coordinate[0][0][0]), int(image_coordinate[0][0][1]))
             cv2.circle(self.dst, estimated_point, 2, (0, 0, 255), -1)
 
-        # selber Ablauf mit dem Behälter
+        # selber Ablauf mit dem Behälter nur wenn die Koordinate des Behälters noch nicht ermittelt wurde
         if not self.found_container and len(self.container_position) > 0:
             y_coordinate_of_smallest_difference = []
             x_b, y_b = self.container_position[0]
