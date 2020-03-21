@@ -4,9 +4,12 @@ from calculate_joint_values import JointValue, Input
 
 class MoveDorna:
     def __init__(self):
+        # Objekt der Dorna-Klasse instanziieren
         self.robot = Dorna("C:\dorna\dorna\my_config.yaml")
+        # Verbindung mit dem Roboter herstellen
         self.robot.connect()
 
+    # Homing-Prozess
     def home(self):
         proceed = False
 
@@ -21,6 +24,7 @@ class MoveDorna:
                 break
 
         if proceed:
+            # Dorna in die Home-Position fahren
             self.robot.home(["j0", "j1", "j2", "j3"])
             print(self.robot.homed())
             print(self.robot.position())
@@ -36,19 +40,22 @@ class MoveDorna:
                     break
 
             if proceed:
+                # Gelenke des Endeffektors nullen
                 self.set_joint_j3_0()
 
     def set_joint_j3_0(self):
         self.robot.set_joint({"j3": 0})
         self.robot.set_joint({"j4": 0})
 
+    # Endeffektor zu einer bestimmten Koordinate fahren
     def move_to_position(self):
+        # Koordinate eingeben
         i = Input()
         output = i.input_values()
         x = output.get("x")
         y = output.get("y")
         z = output.get("z")
-
+        # Koordinate berechnen
         position = JointValue(x, y, z)
         position_result = position.calc_joint_values()
         position_array = self.get_joints(position_result)
@@ -66,12 +73,15 @@ class MoveDorna:
                 break
 
         if proceed:
+            # Bewegung ausführen
             self.move_dorna(position_array)
 
+    # Ablaufsteuerung zum Bälle einsammeln ausführen
     def collect_balls(self):
         n = eval(input("Anzahl der Bälle: "))
         balls_array = []
         out_of_range = False
+        # Koordinaten der Bälle eingeben
         for j in range(n):
             print("Position des", j + 1, ". Balls:")
             i = Input()
@@ -79,10 +89,10 @@ class MoveDorna:
             x = output.get("x")
             y = output.get("y")
             z = output.get("z")
-
-            seven_above_ball = JointValue(x, y, z + 7)
-            five_above_ball = JointValue(x, y, z + 5)
-            one_above_ball = JointValue(x, y, z + 1)
+            # Werte der Gelenke berechnen
+            seven_above_ball = JointValue(x, y, z + 7)  # 7cm über dem Ball
+            five_above_ball = JointValue(x, y, z + 5)   # 5cm über dem Ball
+            one_above_ball = JointValue(x, y, z + 1)    # 1cm über dem Ball
 
             seven_above_ball_result = seven_above_ball.calc_joint_values()
             five_above_ball_result = five_above_ball.calc_joint_values()
@@ -101,13 +111,14 @@ class MoveDorna:
             balls_array.append(balls_dict)
 
         print("Position des Behälters: ")
+        # Koordinate des Behälters angeben
         i = Input()
         output = i.input_values()
         x = output.get("x")
         y = output.get("y")
         z = output.get("z")
-
-        fifteen_above_container = JointValue(x, y, z + 15)
+        # Werte der Gelenke berechnen
+        fifteen_above_container = JointValue(x, y, z + 15)  # 15cm über dem Behälter
         fifteen_above_container_result = fifteen_above_container.calc_joint_values()
 
         if five_above_ball == 1 or one_above_ball == 1:
@@ -138,7 +149,7 @@ class MoveDorna:
                     first = balls_array[i].get("1.")
                     second = balls_array[i].get("2.")
                     third = balls_array[i].get("3.")
-
+                    # Ablaufsteuerung
                     self.open_gripper()
                     self.move_dorna(first)
                     self.move_dorna(second)
@@ -172,6 +183,7 @@ class MoveDorna:
     def move_dorna(self, position):
         self.robot.move({"movement": 0, "path": "joint", "joint": position})
 
+    # Nullposition
     def zero(self):
         self.robot.move({"movement": 0, "path": "joint", "joint": [0, 0, 0, 0, 0]})
 
