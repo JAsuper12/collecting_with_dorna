@@ -49,6 +49,19 @@ class Camera:
         self.increment = 0.25
         self.results = 0
 
+        # Wahl des Ansatzes
+        self.method = 0
+        while self.method <= 0 or self.method >= 4:
+            try:
+                self.method = eval(input("Mit welchem Ansatz sollen die Positionen ermittelt werden?\n (1) GPS-Ansatz\n "
+                                    "(2) Vergleichsansattz\n (3) Berechnen der Weltkoordinaten\n"))
+            except NameError:
+                self.method = 0
+            except SyntaxError:
+                self.method = 0
+            except TypeError:
+                self.method = 0
+
     def show_image(self):
         # Kamera initialisieren
         nRet = ueye.is_InitCamera(self.h_cam, None)
@@ -243,8 +256,13 @@ class Camera:
                 elif i == 2:
                     self.dst = cv2.line(self.dst, p1, p2, (0, 0, 255), 5)
                 i = i + 1
-            # Positionsbestimmung der Bälle und Behälter mit Vergleichsansatz
-            self.get_ball_position_compare()
+            # Positionsbestimmung der Bälle und Behälter
+            if self.method == 1:
+                self.get_ball_position_with_circles()
+            elif self.method == 2:
+                self.get_ball_position_compare()
+            elif self.method == 3:
+                self.get_ball_position_with_matrix()
 
     def qr_decoder(self, data, centre):
         if data == "(70, 10, 0)":
