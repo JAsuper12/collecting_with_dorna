@@ -1,11 +1,15 @@
 from dorna import Dorna
 from calculate_joint_values import JointValue, Input
+import os
+import sys
 
 
 class MoveDorna:
     def __init__(self):
+        path = os.path.dirname(os.path.abspath(sys.argv[0]))
+        path = path + "/config/dorna.yaml"
         # Objekt der Dorna-Klasse instanziieren
-        self.robot = Dorna("C:\dorna\dorna\my_config.yaml")
+        self.robot = Dorna(path)
         # Verbindung mit dem Roboter herstellen
         self.robot.connect()
 
