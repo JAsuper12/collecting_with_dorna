@@ -1,7 +1,7 @@
 import math
 
 
-class CartToPolar:
+class CartesianToPolar:
     def __init__(self, x, y):
         self.x = x
         self.y = y
@@ -27,5 +27,5 @@ class CartToPolar:
 if __name__ == "__main__":
     x_value = eval(input("x Wert: "))
     y_value = eval(input("y Wert: "))
-    polar = CartToPolar(x_value, y_value)
+    polar = CartesianToPolar(x_value, y_value)
     print(polar.calc())

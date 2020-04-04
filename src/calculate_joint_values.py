@@ -1,5 +1,5 @@
 import math
-from cartesian_to_polar import CartToPolar
+from cartesian_to_polar import CartesianToPolar
 import numpy
 
 
