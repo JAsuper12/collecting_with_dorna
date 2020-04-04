@@ -1,0 +1,42 @@
+axis:
+  number: 5
+calibrate:
+  j0: -9.7671
+  j1: 136.7344
+  j2: -85.1807
+  j3: 146.43749499999998
+  j4: 338.67190500000004
+default_jerk:
+  joint:
+  - 300
+  - 300
+  - 300
+  - 300
+  - 300
+  xyz:
+  - 1270.0
+  - 1270.0
+  - 1270.0
+  - 300
+  - 300
+default_speed:
+  joint: 1000
+  xyz: 2540.0
+limit:
+  j0:
+  - 80
+  - 280
+  j1:
+  - -20
+  - 90
+  j2:
+  - -130
+  - 0
+motion:
+  ct: 0.01
+  gpa: 2
+  jt: 1
+toolhead:
+  x: 170.0
+unit:
+  length: mm
