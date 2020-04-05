@@ -4,7 +4,11 @@
 ROS Melodic installieren:
 http://wiki.ros.org/melodic/Installation/Ubuntu
 
-collecting-with-dorna Repositoty herunterladen:
+```bash
+cd catkin_ws/src
+```
+
+collecting-with-dorna Repositoty im Catkin Workspace herunterladen:
 ```bash
 git clone https://github.com/lennarttoenjess/collecting_with_dorna.git
 ```
@@ -16,6 +20,9 @@ git clone https://github.com/dorna-robotics/dorna
 pip3 install setuptools
 cd dorna
 sudo python3 setup.py install
+cd catkin_ws
+catkin_make
+source devel/setup.bash
 ```
 
 IDS-Kameratreiber für die UI-3880LE-C-HQ herunterladen auf:
