@@ -8,7 +8,7 @@ http://wiki.ros.org/melodic/Installation/Ubuntu
 cd ~/catkin_ws/src
 ```
 
-collecting-with-dorna Repositoty im Catkin Workspace herunterladen:
+collecting-with-dorna Repositoty ins Catkin-Workspace herunterladen:
 ```bash
 git clone https://github.com/lennarttoenjess/collecting_with_dorna.git
 ```
