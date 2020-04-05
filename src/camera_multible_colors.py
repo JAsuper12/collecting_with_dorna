@@ -4,6 +4,8 @@ import numpy as np
 import json
 import math as m
 from pyzbar import pyzbar
+import os
+import sys
 
 
 class Camera:
@@ -111,7 +113,9 @@ class Camera:
         cv2.destroyAllWindows()
 
     def load_calibration_config(self):
-        with open("C:\dorna\camera\camera_calibration_config.json", "r") as file:
+        path = os.path.dirname(os.path.abspath(sys.argv[0]))
+        path = path + "/config/camera_calibration_config.json"
+        with open(path, "r") as file:
             data = json.load(file)
             self.camera_matrix = np.array(data["camera_matrix"])
             self.dist_coeff = np.array(data["dist_coeff"])
