@@ -13,8 +13,8 @@ dorna Repository herunterladen und installieren:
 ```bash
 cd collecting_with_dorna
 git clone https://github.com/dorna-robotics/dorna
-cd dorna
 pip3 install setuptools
+cd dorna
 sudo python3 setup.py install
 ```
 
