@@ -50,4 +50,33 @@ sudo apt-get install zbar-tools
 pip3 install pyzbar
 ```
 
+## Anwendung
+### Befehle an den Roboter geben
+Roboter über USB mit dem Computer verbinden
 
+```bash
+cd ~/catkin_ws/src/collecting_with_dorna/src
+python3 move_dorna.py
+```
+
+### Kamera intrinsisch kalibrieren
+Kamera über USB mit dem Computer verbinden
+
+```bash
+cd ~/catkin_ws/src/collecting_with_dorna/src
+python3 camera_intrinsisc_calibration.py
+```
+
+### Positionsbestimmung der Objekte
+Kamera über USB mit dem Computer verbinden
+
+```bash
+cd ~/catkin_ws/src/collecting_with_dorna/src
+python3 camera.py
+```
+oder
+```bash
+cd ~/catkin_ws/src/collecting_with_dorna/src
+python3 camera_multible_colors.py
+```
+für Positionsbestimmung von Objekten mit verschiedenen Farben
