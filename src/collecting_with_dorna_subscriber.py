@@ -4,6 +4,8 @@ import rospy
 from collecting_with_dorna.msg import Coordinates
 from dorna import Dorna
 from calculate_joint_values import JointValue
+import os
+import sys
 
 class Subscriber:
     def __init__(self):
@@ -11,7 +13,9 @@ class Subscriber:
         self.coordinates_sub = rospy.Subscriber("/coordinates", Coordinates, self.callback)
         self.coordinates_msg = Coordinates()
 
-        self.robot = Dorna("/home/lennart/dorna/dorna/my_config.yaml")
+        path = os.path.dirname(os.path.abspath(sys.argv[0]))
+        path = path + "/config/dorna.yaml"
+        self.robot = Dorna(path)
         self.robot.connect()
 
     def home(self):
