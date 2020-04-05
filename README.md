@@ -52,7 +52,7 @@ pip3 install pyzbar
 
 ## Anwendung
 ### Befehle an den Roboter geben
-Roboter über USB mit dem Computer verbinden
+Dorna über USB mit dem Computer verbinden
 
 ```bash
 cd ~/catkin_ws/src/collecting_with_dorna/src
