@@ -1,4 +1,4 @@
-# collecting-with-dorna
+# collecting_with_dorna
 
 ## Installation
 ROS Melodic installieren:
@@ -6,7 +6,7 @@ http://wiki.ros.org/melodic/Installation/Ubuntu
 
 collecting-with-dorna Repositoty herunterladen:
 ```bash
-git clone https://github.com/lennarttoenjess/collecting-with-dorna.git
+git clone https://github.com/lennarttoenjess/collecting_with_dorna.git
 ```
 
 dorna Repository herunterladen und installieren:
