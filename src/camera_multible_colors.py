@@ -23,6 +23,7 @@ class Camera:
         self.width = None
         self.height = None
         self.dst = None
+        self.path_images = os.path.dirname(os.path.abspath(sys.argv[0])) + "/images/"
 
         # laden der intrinsischen Kalibriermatrix
         self.load_calibration_config()
@@ -99,8 +100,8 @@ class Camera:
                 break
             # mit t Bild aufnehemen
             elif cv2.waitKey(100) & 0xFF == ord('t'):
-                cv2.imwrite("C:\dorna\camera\images\image.bmp", self.dst)
-                print("Bilder aufgenommen")
+                cv2.imwrite(self.path_images + "image.bmp", self.dst)
+                print("Bild aufgenommen")
             # mit l Position der Behälter zurücksetzen
             elif cv2.waitKey(100) & 0xFF == ord('l'):
                 self.found_blue_container = False

@@ -23,6 +23,7 @@ class Camera:
         self.width = None
         self.height = None
         self.dst = None
+        self.path_images = os.path.dirname(os.path.abspath(sys.argv[0])) + "/images/"
 
         # laden der intrinsischen Kalibriermatrix
         self.load_calibration_config()
@@ -110,13 +111,15 @@ class Camera:
 
             # mit t derzeitiges Bild aufnehemen
             elif cv2.waitKey(100) & 0xFF == ord('t'):
-                cv2.imwrite("C:\dorna\camera\images\image.bmp", self.dst)
-                cv2.imwrite("C:\dorna\camera\images\mask.bmp", self.show_blue_color)
+                cv2.imwrite(self.path_images + "image.bmp", self.dst)
+                cv2.imwrite(self.path_images + "mask.bmp", self.show_blue_color)
+                print("Bilder aufgenommen")
 
             # mit l Behälterposition zurücksetzen
             elif cv2.waitKey(100) & 0xFF == ord('l'):
                 self.found_container = False
                 self.container_world_position.clear()
+                print("Behälterposition zurückgesetzt")
 
         # Kamera freigeben
         ueye.is_FreeImageMem(self.h_cam, self.pcImageMemory, self.MemID)

@@ -2,6 +2,8 @@ from pyueye import ueye
 import numpy as np
 import cv2
 import json
+import os
+import sys
 
 
 class Camera:
@@ -31,9 +33,7 @@ class Camera:
         self.mean_error = 0
 
         # Pfad zum Speichern der Bilder angeben
-        self.path = input("Pfad zum Speichern der Bilder angeben: ")
-        if self.path == "default":
-            self.path = "C:/dorna/camera/images/"
+        self.path = os.path.dirname(os.path.abspath(sys.argv[0])) + "/images/"
 
     def show_image(self):
         # Kamera initialisieren
@@ -122,11 +122,7 @@ class Camera:
         print("Schachbrettlinien erstellt.")
 
     def calibrate(self):
-        # Pfad zum Speichern der Kameramatrix und Verzerrungskoeffizienten angeben
-        self.path_config = input("Pfad zum Speichern der Konfig-Datei: ")
-        if self.path_config == "default":
-            self.path_config = "C:/dorna/camera/"
-        self.draw_chessboard_corners(75, False)
+        self.draw_chessboard_corners(50, False)
 
         # Kamera intrinsisch kalibrieren
         print("Kamera wird kalibriert.")
@@ -167,7 +163,8 @@ class Camera:
             "dist_coeff": self.dist_coeff.tolist(),
             "mean_error": self.mean_error
         }
-        with open(self.path_config + "camera_calibration_config.json", "w") as file:
+        path_config = os.path.dirname(os.path.abspath(sys.argv[0])) + "config/camera_calibration_config.json"
+        with open(path_config, "w") as file:
             json.dump(data, file)
 
 
