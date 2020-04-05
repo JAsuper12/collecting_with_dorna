@@ -5,7 +5,7 @@ ROS Melodic installieren:
 http://wiki.ros.org/melodic/Installation/Ubuntu
 
 ```bash
-cd catkin_ws/src
+cd ~/catkin_ws/src
 ```
 
 collecting-with-dorna Repositoty im Catkin Workspace herunterladen:
@@ -20,7 +20,7 @@ git clone https://github.com/dorna-robotics/dorna
 pip3 install setuptools
 cd dorna
 sudo python3 setup.py install
-cd catkin_ws
+cd ~/catkin_ws
 catkin_make
 source devel/setup.bash
 ```
