@@ -6,7 +6,7 @@ http://wiki.ros.org/melodic/Installation/Ubuntu
 
 collecting-with-dorna Repositoty herunterladen:
 ```bash
-git clone https://github.com/lennarttoenjess/collecting-with-dorna.gitcd#
+git clone https://github.com/lennarttoenjess/collecting-with-dorna.git
 ```
 
 dorna Repository herunterladen und installieren:
