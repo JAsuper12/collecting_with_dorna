@@ -77,3 +77,23 @@ cd ~/catkin_ws/src/collecting_with_dorna/src
 python3 camera_multible_colors.py
 ```
 für Positionsbestimmung von Objekten mit verschiedenen Farben
+
+### Bälle automatisch einsammeln
+Kamera und Dorna über USB mit dem Computer verbinden
+
+```bash
+roscore
+```
+in einem neuem Terminal:
+
+```bash
+cd ~/catkin_ws/src/collecting_with_dorna/src
+python3 collecting_with_dorna_publisher.py
+```
+
+in einem neuem Terminal:
+
+```bash
+cd ~/catkin_ws/src/collecting_with_dorna/src
+python3 collecting_with_dorna_subscriber.py
+```
