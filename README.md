@@ -4,12 +4,9 @@
 ROS Melodic installieren:
 http://wiki.ros.org/melodic/Installation/Ubuntu
 
-```bash
-cd ~/catkin_ws/src
-```
-
 collecting-with-dorna Repositoty im Catkin-Workspace herunterladen:
 ```bash
+cd ~/catkin_ws/src
 git clone https://github.com/lennarttoenjess/collecting_with_dorna.git
 ```
 
