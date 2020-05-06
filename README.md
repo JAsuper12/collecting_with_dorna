@@ -82,6 +82,8 @@ für Positionsbestimmung von Objekten mit verschiedenen Farben
 Kamera und Dorna über USB mit dem Computer verbinden
 
 ```bash
+cd catkin_ws
+source devel/setup.bash
 roscore
 ```
 in einem neuem Terminal:
