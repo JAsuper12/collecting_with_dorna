@@ -75,18 +75,20 @@ class Camera:
 
             # mit d Schachbrettlinien zeichnen und speichern
             elif cv2.waitKey(1) & 0xFF == ord('d'):
-                n_img = eval(input("Wie viele Bilder sollen bearbeitet werden? "))
-                self.draw_chessboard_corners(n_img, True)
+                self.draw_chessboard_corners(True)
 
             # mit c Kamera intrinsisch kalibrieren
             elif cv2.waitKey(1) & 0xFF == ord('c'):
-                self.calibrate()
+                if self.n_im > 0:
+                    self.calibrate()
+                else:
+                    print("Vorher Bilder aufnehmen!")
 
         ueye.is_FreeImageMem(self.h_cam, self.pcImageMemory, self.MemID)
         ueye.is_ExitCamera(self.h_cam)
         cv2.destroyAllWindows()
 
-    def draw_chessboard_corners(self, n_img, save):
+    def draw_chessboard_corners(self, save):
         print("Schabrettlinien werden erstellt.")
         criteria = (cv2.TermCriteria_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
         # Weltkoordinaten der Referenzpunkte des Schachbrettmusters speichern
@@ -97,8 +99,8 @@ class Camera:
         self.imagepoints = []
         images = []
 
-        for x in range(n_img):
-            print("Bild Nummer", x, "wird erstellt")
+        for x in range(self.n_im):
+            print("Bild", x + 1, "wird erstellt")
             images.append(self.path + str(x) + ".bmp")
         x = 0
         for fname in images:
@@ -115,14 +117,14 @@ class Camera:
                 # Bild mit eingezeichneten Schachbrettmuster speichern
                 if save:
                     img = cv2.drawChessboardCorners(img, (self.nx, self.ny), corners2, ret)
-                    cb_img = self.path + str(x) + ".bmp"
+                    cb_img = self.path + str(x) + "_corners.bmp"
                     cv2.imwrite(cb_img, img)
                     print("Bild gespeichert")
                     x = x + 1
         print("Schachbrettlinien erstellt.")
 
     def calibrate(self):
-        self.draw_chessboard_corners(50, False)
+        self.draw_chessboard_corners(False)
 
         # Kamera intrinsisch kalibrieren
         print("Kamera wird kalibriert.")
@@ -163,7 +165,7 @@ class Camera:
             "dist_coeff": self.dist_coeff.tolist(),
             "mean_error": self.mean_error
         }
-        path_config = os.path.dirname(os.path.abspath(sys.argv[0])) + "config/camera_calibration_config.json"
+        path_config = os.path.dirname(os.path.abspath(sys.argv[0])) + "/config/camera_calibration_config.json"
         with open(path_config, "w") as file:
             json.dump(data, file)
 
