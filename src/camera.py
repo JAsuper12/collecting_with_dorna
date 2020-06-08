@@ -174,6 +174,7 @@ class Camera:
             if len(approx) == 4 and not self.found_container:
                 # Bereich wurde als Rechteck erkannt und wird daher als Behälter identifiziert
                 self.contours_rectangle.append(con)
+                self.found_container = True
 
             elif 0.8 < circularity:
                 # Bereich wurde als Kreis erkannt und wird daher als Ball identifiziert
