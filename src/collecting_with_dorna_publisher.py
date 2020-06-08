@@ -82,7 +82,7 @@ class PublishCoordinates:
 
             self.detect_colors()
 
-            self.qr_decoder()
+            self.extrinsic_calibration()
 
             cv2.imshow("camera", self.dst)
 
@@ -91,6 +91,11 @@ class PublishCoordinates:
 
             elif cv2.waitKey(1) & 0xFF == ord('t'):
                 cv2.imwrite("/home/lennart/dorna/camera/images/gps.bmp", self.dst)
+
+            elif cv2.waitKey(100) & 0xFF == ord('l'):
+                self.found_container = False
+                self.container_world_position.clear()
+                print("Behälterposition zurückgesetzt")
 
         ueye.is_FreeImageMem(self.h_cam, self.pcImageMemory, self.MemID)
         ueye.is_ExitCamera(self.h_cam)
@@ -127,98 +132,78 @@ class PublishCoordinates:
         if not self.found_container:
             self.contours_rectangle.clear()
 
+        # Bereiche auf Größe überprüfen
         for con in contours:
             area = cv2.contourArea(con)
             if 200 < area < 10000:
                 contours_area.append(con)
 
+        # Form des Bereiches ermitteln
         for con in contours_area:
             perimeter = cv2.arcLength(con, True)
             area = cv2.contourArea(con)
-            approx = cv2.approxPolyDP(con, 0.04 * perimeter, True)
+            approx = cv2.approxPolyDP(con, 0.01 * perimeter, True)
 
-            circularity = 4 * m.pi * (area / (perimeter * perimeter))
+            circularity = 4 * m.pi * (area / (perimeter ** 2))
 
             if len(approx) == 4 and not self.found_container:
-                # compute the bounding box of the contour
+                # Bereich wurde als Rechteck erkannt und wird daher als Behälter identifiziert
                 self.contours_rectangle.append(con)
+                self.found_container = True
 
             elif 0.8 < circularity:
+                # Bereich wurde als Kreis erkannt und wird daher als Ball identifiziert
                 contours_circles.append(con)
 
         for cnt in contours_circles:
+            # Mittelpunkte der Bälle berechnen und Bildposition speichern
             M = cv2.moments(cnt)
             self.cX = int(M["m10"] / M["m00"])
             self.cY = int(M["m01"] / M["m00"]) + 5
             self.ball_position.append((self.cX, self.cY))
-
+            # Kontur des Balles einzeichnen
             cv2.drawContours(self.dst, [cnt], 0, (0, 255, 0), 1)
+            # Mittelpunkt einzeichnen
             cv2.circle(self.dst, (self.cX, self.cY), 2, (0, 255, 0), -1)
 
         for cnt in self.contours_rectangle:
+            # Mittelpunkt des Behälters berechnen und Bildposition speichern
             M = cv2.moments(cnt)
             self.cX_container = int(M["m10"] / M["m00"])
             self.cY_container = int(M["m01"] / M["m00"])
             self.container_position.append((self.cX_container, self.cY_container))
+            # Kontur des Behälters einzeichnen
             cv2.drawContours(self.dst, [cnt], 0, (0, 128, 255), 1)
+            # Mittelpunkt einzeichnen
             cv2.circle(self.dst, (self.cX_container, self.cY_container), 1, (0, 128, 255), -1)
 
-    def qr_decoder(self):
+    def extrinsic_calibration(self):
         self.qr_centres.clear()
         self.world_points.clear()
         self.localization_qr_codes.clear()
         self.world_localization_qr_codes.clear()
         self.qr_codes = pyzbar.decode(self.dst)
-
+        # alle erkannten QR-Codes durchgehen
         for qr in self.qr_codes:
+            # Position des Codes ermitteln
             (x, y, w, h) = qr.rect
-
+            # Mittelpunkt des Codes berechnen und als Bildkoordinate speichern
             centre = (x + int((w / 2)), y + int((h / 2)))
             self.qr_centres.append(centre)
-
+            # erkannten Code umrahmen
             cv2.rectangle(self.dst, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            # Mittelpunkt einzeichnen
             cv2.circle(self.dst, centre, 2, (0, 255, 0), -1)
-
+            # Daten aus dem Codes als String speichern
             data = qr.data.decode("utf-8")
-
-            if data == "(70, 10, 0)":
-                world_point = (70, 10, 0)
-                if len(self.localization_qr_codes) < 3:
-                    self.localization_qr_codes.append(centre)
-                    self.world_localization_qr_codes.append([70, 10, 0])
-            elif data == "(60, 40, 0)":
-                world_point = (60, 40, 0)
-                if len(self.localization_qr_codes) < 3:
-                    self.localization_qr_codes.append(centre)
-                    self.world_localization_qr_codes.append([60, 40, 0])
-            elif data == "(40, 60, 0)":
-                world_point = (40, 60, 0)
-                if len(self.localization_qr_codes) < 3:
-                    self.localization_qr_codes.append(centre)
-                    self.world_localization_qr_codes.append([40, 60, 0])
-            elif data == "(-40, 60, 0)":
-                world_point = (-40, 60, 0)
-                if len(self.localization_qr_codes) < 3:
-                    self.localization_qr_codes.append(centre)
-                    self.world_localization_qr_codes.append([-40, 60, 0])
-            elif data == "(-60, 40, 0)":
-                world_point = (-60, 40, 0)
-                if len(self.localization_qr_codes) < 3:
-                    self.localization_qr_codes.append(centre)
-                    self.world_localization_qr_codes.append([-60, 40, 0])
-            elif data == "(-70, 10, 0)":
-                world_point = (-70, 10, 0)
-                if len(self.localization_qr_codes) < 3:
-                    self.localization_qr_codes.append(centre)
-                    self.world_localization_qr_codes.append([-70, 10, 0])
-
-            self.world_points.append(world_point)
-
+            # Weltkoordinate des Codes speichern
+            self.qr_decoder(data, centre)
+            # Daten über den Code einzeichnen
             text = "{}".format(data)
             cv2.putText(self.dst, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
         world_points = np.array(self.world_points, dtype="float")
-
+        # prüfen, ob die qr Codes gut verteilt sind
         positive_qr_codes = 0
         negative_qr_codes = 0
         for coordinates in world_points:
@@ -226,23 +211,28 @@ class PublishCoordinates:
                 positive_qr_codes = positive_qr_codes + 1
             else:
                 negative_qr_codes = negative_qr_codes + 1
-
-        if positive_qr_codes >= 2 and negative_qr_codes >= 2:
+        if positive_qr_codes >= 3 and negative_qr_codes >= 3:
             valid_qr_spread = True
         else:
             valid_qr_spread = False
 
-        if len(self.qr_centres) >= 4 and valid_qr_spread:
+        # wenn genügend Codes erkannt wurden und diese gut verteilt sind, soll die Kamera extrinsisch kalibriert werden
+        if len(self.qr_centres) >= 6 and valid_qr_spread:
             self.image_points_of_qr_codes = np.array(self.qr_centres, dtype="float")
-
-            _, self.rvecs, self.tvecs = cv2.solvePnP(world_points, self.image_points_of_qr_codes, self.camera_matrix, self.dist_coeff)
-
-            self.origin, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-            z_axis, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 10.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-            x_axis, jacobian = cv2.projectPoints(np.array([(10.0, 0.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
-            y_axis, jacobian = cv2.projectPoints(np.array([(0.0, 10.0, 0.0)]), self.rvecs, self.tvecs, self.camera_matrix, self.dist_coeff)
+            # Kamera extrinsisch Kalibrieren
+            _, self.rvecs, self.tvecs = cv2.solvePnP(world_points, self.image_points_of_qr_codes, self.camera_matrix,
+                                                     self.dist_coeff)
+            # Bildkoordinaten der Koordinatenachsen berechnen
+            self.origin, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 0.0)]), self.rvecs, self.tvecs,
+                                                      self.camera_matrix, self.dist_coeff)
+            z_axis, jacobian = cv2.projectPoints(np.array([(0.0, 0.0, 55.0)]), self.rvecs, self.tvecs,
+                                                 self.camera_matrix, self.dist_coeff)
+            x_axis, jacobian = cv2.projectPoints(np.array([(55.0, 0.0, 0.0)]), self.rvecs, self.tvecs,
+                                                 self.camera_matrix, self.dist_coeff)
+            y_axis, jacobian = cv2.projectPoints(np.array([(0.0, 55.0, 0.0)]), self.rvecs, self.tvecs,
+                                                 self.camera_matrix, self.dist_coeff)
             axis = [x_axis, y_axis, z_axis]
-
+            # Koordinatenachsen einzeichnen
             i = 0
             for x in axis:
                 p1 = (int(self.origin[0][0][0]), int(self.origin[0][0][1]))
@@ -254,9 +244,108 @@ class PublishCoordinates:
                 elif i == 2:
                     self.dst = cv2.line(self.dst, p1, p2, (0, 0, 255), 5)
                 i = i + 1
-            self.get_ball_position_with_grid()
+            self.get_ball_position_compare()
 
-    def get_ball_position_with_grid(self):
+        else:
+            self.coordinates_msg.ball_coordinates = []
+            for container in self.container_world_position:
+                self.coordinates_msg.container_coordinates = container
+
+            self.coordinates_pub.publish(self.coordinates_msg)
+
+    def qr_decoder(self, data, centre):
+        if data == "(70, 10, 0)":
+            self.world_points.append((70, 10, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([70, 10, 0])
+        elif data == "(60, 40, 0)":
+            self.world_points.append((60, 40, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([60, 40, 0])
+        elif data == "(40, 60, 0)":
+            self.world_points.append((40, 60, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([40, 60, 0])
+        elif data == "(-40, 60, 0)":
+            self.world_points.append((-40, 60, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([-40, 60, 0])
+        elif data == "(-60, 40, 0)":
+            self.world_points.append((-60, 40, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([-60, 40, 0])
+        elif data == "(-70, 10, 0)":
+            self.world_points.append((-70, 10, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([-70, 10, 0])
+        elif data == "q":
+            self.world_points.append((65, 25, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([65, 25, 0])
+        elif data == "a":
+            self.world_points.append((57.5, 55, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([57.5, 55, 0])
+        elif data == "b":
+            self.world_points.append((20, 65, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([20, 65, 0])
+        elif data == "c":
+            self.world_points.append((-20, 65, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([-20, 65, 0])
+        elif data == "d":
+            self.world_points.append((-57.5, 55, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([-57.5, 55, 0])
+        elif data == "p":
+            self.world_points.append((-65, 25, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([-65, 25, 0])
+        elif data == "e":
+            self.world_points.append((55, -10, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([55, -10, 0])
+        elif data == "f":
+            self.world_points.append((35, -10, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([35, -10, 0])
+        elif data == "g":
+            self.world_points.append((15, -10, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([15, -10, 0])
+        elif data == "h":
+            self.world_points.append((-15, -10, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([-15, -10, 0])
+        elif data == "i":
+            self.world_points.append((-35, -10, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([-35, -10, 0])
+        elif data == "j":
+            self.world_points.append((-55, -10, 0))
+            if len(self.localization_qr_codes) < 3:
+                self.localization_qr_codes.append(centre)
+                self.world_localization_qr_codes.append([-55, -10, 0])
+
+    def get_ball_position_compare(self):
         self.coordinates_msg.ball_coordinates = []
         ball_world_positions = []
         for ball in self.ball_position:
@@ -347,6 +436,7 @@ class PublishCoordinates:
             self.coordinates_msg.container_coordinates = container
 
         self.coordinates_pub.publish(self.coordinates_msg)
+
 
 if __name__ == '__main__':
     publisher = PublishCoordinates()
