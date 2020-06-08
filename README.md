@@ -82,20 +82,22 @@ für Positionsbestimmung von Objekten mit verschiedenen Farben
 Kamera und Dorna über USB mit dem Computer verbinden
 
 ```bash
-cd catkin_ws
-source devel/setup.bash
 roscore
 ```
 in einem neuem Terminal:
 
 ```bash
-cd ~/catkin_ws/src/collecting_with_dorna/src
+cd ~/catkin_ws
+source devel/setup.bash
+cd src/collecting_with_dorna/src
 python3 collecting_with_dorna_publisher.py
 ```
 
 in einem neuem Terminal:
 
 ```bash
-cd ~/catkin_ws/src/collecting_with_dorna/src
+cd ~/catkin_ws
+source devel/setup.bash
+cd src/collecting_with_dorna/src
 python3 collecting_with_dorna_subscriber.py
 ```
